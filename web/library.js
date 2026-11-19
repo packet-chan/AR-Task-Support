@@ -65,7 +65,7 @@ const milestones = [
   ["部品補正", '<path d="M14 5a5 5 0 0 0-6 6L3.5 16a2.5 2.5 0 0 0 3.5 3.5l5-5A5 5 0 0 0 18 8l-3 3-2-2 3-4z"/>']
 ];
 
-function manualTile({id, name, model, cover}) {
+function manualTile({id, name, model, cover, stage, failed}) {
   const tile = element("a", "tile");
   const base = api + "/" + encodeURIComponent(id);
   tile.href = base + "/pdf";
@@ -98,7 +98,13 @@ function manualTile({id, name, model, cover}) {
   caption.append(element("strong", "", name));
   if (model) caption.append(element("span", "model-number", model));
   tile.append(row, caption);
-  return tile;
+  const item = element("article");
+  const labels = {models: "型番を確認中", select: "型番を選ぶ", s1: "手順と図を抽出中",
+    s2: "初版モデルを作成中", ready: "初版の作業支援を開く"};
+  const support = element("a", "support-link", failed ? "生成状況を確認" : labels[stage] || "作業支援を作成");
+  support.href = "/support.html?" + new URLSearchParams({user: participant, id});
+  item.append(tile, support);
+  return item;
 }
 
 async function refresh(focusId) {
@@ -150,6 +156,7 @@ form.onsubmit = async event => {
     const response = await fetch(api, {method: "POST", headers: {
       "Content-Type": "application/pdf",
       "X-Import-ID": importId,
+      "X-Production": "v1",
       "X-Library-Generation": generation,
       "X-Manual-Name": encodeURIComponent(name),
       "X-Model": encodeURIComponent(form.elements.model.value.trim())
@@ -165,7 +172,7 @@ form.onsubmit = async event => {
   }
   if (savedId) {
     dialog.close();
-    await refresh(savedId);
+    location.assign("/support.html?" + new URLSearchParams({user: participant, id: savedId}));
   }
 };
 retry.onclick = () => refresh();

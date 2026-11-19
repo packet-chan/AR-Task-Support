@@ -100,6 +100,7 @@ button { color: inherit; font: inherit; cursor: pointer; touch-action: manipulat
 .import-dialog button:disabled { opacity: .5; cursor: default; }
 .pdf-placeholder { font-weight: 650; color: #436353; border: 2px solid currentColor; padding: 20px 8px; border-radius: 4px; }
 #list-status:empty { display: none; }
+.support-link { display: inline-block; margin: 0 0 8px 57px; color: #245a49; text-underline-offset: 4px; }
 @media (max-width: 560px) {
   .grid { gap: 20px; }
   .tile { --rail: 34px; --gap: 10px; }

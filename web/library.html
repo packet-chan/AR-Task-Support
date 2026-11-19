@@ -29,7 +29,8 @@
       <label>説明書PDF<input type="file" accept=".pdf,application/pdf" required></label>
       <fieldset hidden disabled>
         <label>機器名<input type="text" name="device" required></label>
-        <label>型番（任意）<input type="text" name="model"></label>
+        <label>型番の手掛かり（任意）<input type="text" name="model" maxlength="160"></label>
+        <p>登録後、CodexでPDFを読み取り、型番の候補を表示します。</p>
       </fieldset>
       <p class="import-feedback" role="status"></p>
       <div class="actions">
@@ -40,7 +41,7 @@
   </dialog>
   <dialog class="import-dialog" id="delete-dialog" aria-labelledby="delete-heading" aria-describedby="delete-description">
     <h2 id="delete-heading"></h2>
-    <p id="delete-description">このユーザーの機器情報・PDF・表紙をすべて削除します。この操作は取り消せません。</p>
+    <p id="delete-description">このユーザーの機器情報・PDF・表紙・生成した作業支援をすべて削除します。この操作は取り消せません。</p>
     <p id="delete-error" role="alert"></p>
     <div class="actions">
       <button type="button" id="keep-user" class="btn" autofocus>キャンセル</button>
