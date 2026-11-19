@@ -1,0 +1,172 @@
+const participant = location.pathname.split("/")[2];
+document.querySelector("#participant").textContent = participant;
+document.title = participant + " の機器一覧 | AR作業支援";
+const userApi = "/api/users/" + encodeURIComponent(participant);
+const api = userApi + "/manuals";
+const list = document.querySelector("#manuals");
+const listStatus = document.querySelector("#list-status");
+const retry = document.querySelector("#retry");
+const dialog = document.querySelector("dialog[aria-labelledby='import-heading']");
+const form = dialog.querySelector("form");
+const file = form.querySelector("input[type=file]");
+const metadata = form.querySelector("fieldset");
+const feedback = form.querySelector(".import-feedback");
+const submit = form.querySelector("button[type=submit]");
+const cancel = form.querySelector("#cancel");
+let importId;
+let listRequest = 0;
+let generation;
+const deleteButton = document.querySelector("#delete-user");
+const deleteDialog = document.querySelector("#delete-dialog");
+const keepButton = document.querySelector("#keep-user");
+const confirmDelete = document.querySelector("#confirm-delete");
+const deleteError = document.querySelector("#delete-error");
+const addButton = document.querySelector("#add");
+
+deleteButton.onclick = () => {
+  document.querySelector("#delete-heading").textContent = participant + " を削除しますか？";
+  deleteError.textContent = "";
+  deleteDialog.dataset.generation = generation;
+  deleteDialog.showModal();
+  keepButton.focus();
+};
+keepButton.onclick = () => deleteDialog.close();
+deleteDialog.oncancel = event => { if (confirmDelete.disabled) event.preventDefault(); };
+confirmDelete.onclick = async () => {
+  if (confirmDelete.disabled) return;
+  confirmDelete.disabled = keepButton.disabled = true;
+  deleteError.textContent = "";
+  try {
+    const response = await fetch(userApi, {method: "DELETE", headers: {"X-Library-Generation": deleteDialog.dataset.generation}});
+    if (response.status === 409) {
+      deleteError.textContent = "ユーザー情報が変わりました。一覧を開き直してください。";
+    } else if (!response.ok) {
+      throw new Error();
+    } else {
+      location.replace("/");
+      return;
+    }
+  } catch {
+    deleteError.textContent = "削除できませんでした。配信PCへの接続を確認してください。";
+  }
+  confirmDelete.disabled = keepButton.disabled = false;
+};
+
+function element(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text) node.textContent = text;
+  return node;
+}
+
+const milestones = [
+  ["PDF取込済み", '<path d="M6 2.5h8l4 4V21H6z M14 2.5v5h4 M9 12h6 M9 16h5"/>'],
+  ["動画で改善", '<rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/>'],
+  ["部品補正", '<path d="M14 5a5 5 0 0 0-6 6L3.5 16a2.5 2.5 0 0 0 3.5 3.5l5-5A5 5 0 0 0 18 8l-3 3-2-2 3-4z"/>']
+];
+
+function manualTile({id, name, model, cover}) {
+  const tile = element("a", "tile");
+  const base = api + "/" + encodeURIComponent(id);
+  tile.href = base + "/pdf";
+  tile.target = "_blank";
+  tile.rel = "noopener";
+  tile.dataset.id = id;
+  tile.setAttribute("aria-label", [name, model, "PDF取込済み", "PDFを開く"].filter(Boolean).join("、"));
+  const row = element("span", "tile-row");
+  const rail = element("span", "rail");
+  rail.setAttribute("aria-hidden", "true");
+  milestones.forEach(([label, path], index) => {
+    const dot = element("span", index === 0 ? "milestone current" : "milestone");
+    dot.title = label;
+    dot.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round">' + path + '</svg>';
+    rail.append(dot);
+  });
+  const picture = element("span", "picture");
+  if (cover) {
+    const img = element("img");
+    img.src = base + "/cover";
+    img.alt = "";
+    img.width = 320;
+    img.height = 250;
+    picture.append(img);
+  } else {
+    picture.append(element("span", "pdf-placeholder", "PDF"));
+  }
+  row.append(rail, picture);
+  const caption = element("span", "body");
+  caption.append(element("strong", "", name));
+  if (model) caption.append(element("span", "model-number", model));
+  tile.append(row, caption);
+  return tile;
+}
+
+async function refresh(focusId) {
+  const request = ++listRequest;
+  retry.hidden = true;
+  try {
+    const response = await fetch(api, {cache: "no-store", signal: AbortSignal.timeout(8000)});
+    if (!response.ok) throw new Error();
+    const rows = await response.json();
+    if (request !== listRequest) return;
+    generation = response.headers.get("X-Library-Generation");
+    deleteButton.disabled = addButton.disabled = !generation;
+    list.replaceChildren(...rows.map(manualTile));
+    listStatus.textContent = rows.length ? "" : "まだ機器が登録されていません。";
+    if (focusId) list.querySelector('[data-id="' + CSS.escape(focusId) + '"]')?.focus();
+  } catch {
+    if (request !== listRequest) return;
+    listStatus.textContent = "機器一覧を読み込めませんでした。";
+    retry.hidden = false;
+  }
+}
+
+addButton.onclick = () => {
+  form.reset();
+  metadata.hidden = metadata.disabled = submit.disabled = true;
+  feedback.textContent = "";
+  dialog.showModal();
+  file.focus();
+};
+file.onchange = () => {
+  const pdf = file.files[0];
+  metadata.hidden = metadata.disabled = submit.disabled = !pdf;
+  form.elements.device.value = pdf ? pdf.name.replace(/\.pdf$/i, "") : "";
+  feedback.textContent = "";
+  importId = crypto.randomUUID();
+};
+cancel.onclick = () => dialog.close();
+dialog.oncancel = event => { if (file.disabled) event.preventDefault(); };
+form.onsubmit = async event => {
+  event.preventDefault();
+  const pdf = file.files[0];
+  const name = form.elements.device.value.trim();
+  if (!pdf || file.disabled) return;
+  if (!name) { form.elements.device.focus(); return; }
+  file.disabled = metadata.disabled = submit.disabled = cancel.disabled = true;
+  feedback.textContent = "取り込み中…";
+  let savedId;
+  try {
+    const response = await fetch(api, {method: "POST", headers: {
+      "Content-Type": "application/pdf",
+      "X-Import-ID": importId,
+      "X-Library-Generation": generation,
+      "X-Manual-Name": encodeURIComponent(name),
+      "X-Model": encodeURIComponent(form.elements.model.value.trim())
+    }, body: pdf});
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "保存できませんでした。");
+    savedId = result.id;
+  } catch (error) {
+    feedback.textContent = error instanceof TypeError || error instanceof SyntaxError
+      ? "配信PCに接続できませんでした。もう一度お試しください。" : error.message;
+  } finally {
+    file.disabled = metadata.disabled = submit.disabled = cancel.disabled = false;
+  }
+  if (savedId) {
+    dialog.close();
+    await refresh(savedId);
+  }
+};
+retry.onclick = () => refresh();
+refresh();
