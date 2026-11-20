@@ -1,3 +1,5 @@
+import {language, t, ui} from "./language.js";
+
 const byId = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 const user = encodeURIComponent(params.get("user") || "");
@@ -15,15 +17,23 @@ async function asset(path) {
 }
 
 function label(text) {
-  return text.ja || text[guide.source_language];
+  return text[language] || text[guide.source_language];
 }
+
+byId("image").onload = event => {
+  const image = event.currentTarget;
+  image.style.setProperty("--figure-ratio", image.naturalWidth / image.naturalHeight);
+  image.style.setProperty("--double-width", (2 * image.naturalWidth) + "px");
+};
 
 function showFigure() {
   byId("illustration").hidden = !figures.length;
   if (!figures.length) return;
   const figure = figures[figureIndex];
   byId("image").src = api + "/S1/figure/" + encodeURIComponent(figure.file);
-  byId("fig-count").textContent = (figure.point ? "部品図 " : "手順図 ") + (figureIndex + 1) + " / " + figures.length;
+  ui(byId("fig-count"), figure.point ? "部品図 {index} / {total}" : "手順図 {index} / {total}", {
+    index: figureIndex + 1, total: figures.length
+  });
   byId("prev").disabled = figureIndex === 0;
   byId("next").disabled = figureIndex + 1 === figures.length;
   const pin = byId("pin");
@@ -36,33 +46,99 @@ function showFigure() {
 byId("prev").onclick = () => { figureIndex--; showFigure(); };
 byId("next").onclick = () => { figureIndex++; showFigure(); };
 
+function pageLink(page) {
+  const a = document.createElement("a");
+  a.textContent = "p." + page + " ";
+  a.href = manual + "/pdf#page=" + page;
+  a.target = "_blank"; a.rel = "noopener";
+  return a;
+}
+
 function showStep() {
   const task = guide.tasks[byId("tasks").selectedIndex];
   const step = task.steps[byId("steps").selectedIndex];
   const link = bindings?.steps[step.id];
   const part = link?.target_part ? bindings.parts[link.target_part] : null;
-  byId("instruction").textContent = label(step.text);
-  byId("pages").replaceChildren(...step.pages.map(page => {
-    const a = document.createElement("a");
-    a.textContent = "p." + page + " ";
-    a.href = manual + "/pdf#page=" + page;
-    a.target = "_blank"; a.rel = "noopener";
-    return a;
-  }));
+  const taskIndex = byId("tasks").selectedIndex;
+  const stepIndex = byId("steps").selectedIndex;
+  const position = guide.tasks.slice(0, taskIndex).reduce((count, t) => count + t.steps.length, stepIndex + 1);
+  const total = guide.tasks.reduce((count, t) => count + t.steps.length, 0);
+  byId("counter").textContent = String(position).padStart(2, "0") + " / " + total;
+  byId("step-back").disabled = position === 1;
+  byId("step-next").disabled = position === total;
+  showInstruction(step);
+  byId("instruction").scrollTop = 0;
+  byId("pages").replaceChildren(...step.pages.map(pageLink));
   const marks = new Map((part?.figures || []).map(mark => [mark.file, mark]));
   const files = new Set([...step.figures, ...marks.keys()]);
   figures = [...files].map(file => marks.get(file) || {file});
   figureIndex = 0;
   showFigure();
-  byId("play").hidden = !(viewer && link?.clips.length);
+  byId("play").disabled = !(viewer && link?.clips.length);
+  byId("panel").hidden = !part;
+  byId("panel").textContent = part?.name || "";
+  byId("panel").lang = guide.source_language;
   viewer?.select(part, link?.clips || []);
 }
 
+function showInstruction(step) {
+  const displayed = step.text[language] ? language : guide.source_language;
+  byId("instruction").lang = displayed;
+  byId("instruction").textContent = label(step.text);
+  byId("language").textContent = t(displayed === guide.source_language ? "原文" : displayed === "en" ? "英訳" : "日本語訳");
+}
+
+function showTaskText(task) {
+  byId("task-title").textContent = label(task.title);
+  const precautions = task.precautions || [];
+  byId("precautions").hidden = !precautions.length;
+  byId("task-title").lang = task.title[language] ? language : guide.source_language;
+  byId("precaution-list").replaceChildren(...precautions.map(note => {
+    const li = document.createElement("li");
+    li.lang = note.text[language] ? language : guide.source_language;
+    li.append(label(note.text) + " ", ...note.pages.map(pageLink));
+    return li;
+  }));
+}
+
+document.addEventListener("guide-language-change", () => {
+  if (!guide) return;
+  const tasks = byId("tasks"), steps = byId("steps");
+  const task = guide.tasks[tasks.selectedIndex];
+  for (const [i, entry] of guide.tasks.entries()) tasks.options[i].text = label(entry.title);
+  for (const [i, step] of task.steps.entries()) steps.options[i].text = (i + 1) + ". " + label(step.text);
+  showTaskText(task);
+  showInstruction(task.steps[steps.selectedIndex]);
+});
+
 function showTask() {
   const task = guide.tasks[byId("tasks").selectedIndex];
-  byId("steps").replaceChildren(...task.steps.map((step, i) => new Option(String(i + 1), step.id)));
+  showTaskText(task);
+  byId("precautions").open = !!task.precautions?.length;
+  byId("precaution-list").scrollTop = 0;
+  byId("steps").replaceChildren(...task.steps.map((step, i) => new Option((i + 1) + ". " + label(step.text), step.id)));
   showStep();
 }
+
+function moveStep(direction) {
+  const tasks = byId("tasks"), steps = byId("steps");
+  const next = steps.selectedIndex + direction;
+  if (next >= 0 && next < steps.length) {
+    steps.selectedIndex = next;
+  } else {
+    const nextTask = tasks.selectedIndex + direction;
+    if (nextTask < 0 || nextTask >= tasks.length) return;
+    tasks.selectedIndex = nextTask;
+    showTask();
+    if (direction > 0) return;
+    steps.selectedIndex = steps.length - 1;
+  }
+  showStep();
+}
+byId("step-back").onclick = () => moveStep(-1);
+byId("step-next").onclick = () => moveStep(1);
+byId("index").onclick = () => byId("contents").showModal();
+byId("exit").onclick = () => location.assign(byId("back").href);
 
 async function loadGuide(ready) {
   if (!guide) {
@@ -77,14 +153,14 @@ async function loadGuide(ready) {
   if (ready && !bindings) {
     bindings = await asset("S2/bindings.json");
     byId("viewport").hidden = false;
-    byId("model-status").textContent = "3Dモデルを読み込み中…";
+    ui(byId("model-status"), "3Dモデルを読み込み中…");
     try {
-      const {loadViewer} = await import("./viewer.js");
+      const {loadViewer} = await import("./viewer.js?quest-panel");
       viewer = await loadViewer(api + "/S2/model.glb");
-      byId("model-status").textContent = "";
+      ui(byId("model-status"), "");
       byId("play").onclick = () => viewer.replay();
     } catch {
-      byId("model-status").textContent = "3Dを表示できません。WebGLと配信PCのThree.jsの設定を確認してください。";
+      ui(byId("model-status"), "3Dを表示できません。WebGLと配信PCのThree.jsの設定を確認してください。");
     }
     showStep();
   }
@@ -102,29 +178,30 @@ async function refresh(action) {
     if (!response.ok) throw new Error(data.error);
     token = response.headers.get("X-Library-Generation");
     state = data;
-    byId("name").textContent = data.name;
-    document.title = data.name + " | 作業支援";
+    ui(byId("name"), "{name}", {name: data.name});
+    byId("model").textContent = data.model || "";
+    ui(document.querySelector("title"), "{name} | 作業支援", {name: data.name});
     const status = {models: "PDFから型番を確認中…", select: "型番を選ぶと手順と3Dモデルを作成します。",
-      s1: "手順と図を抽出中…", s2: "初版モデルを作成中…", ready: "PDFから作成した初版"};
-    byId("status").textContent = data.error || ((data.model && ["s1","s2","ready"].includes(data.stage) ? data.model + " · " : "")
-      + (status[data.stage] || "登録済みPDFから作業支援を作成できます。"));
+      s1: "手順と図を抽出中…", s2: "初版モデルを作成中…"};
+    ui(byId("status"), data.error || (data.stage === "ready" ? "" :
+      status[data.stage] || "登録済みPDFから作業支援を作成できます。"));
     byId("choose").hidden = data.stage !== "select";
     if (data.stage === "select") {
-      byId("models").replaceChildren(...data.models.map(m => new Option(m.model + "（p." + m.page + "）", m.model)));
+      byId("models").replaceChildren(...data.models.map(m => new Option(m.model + " (p." + m.page + ")", m.model)));
       byId("models").hidden = !data.models.length;
       byId("custom").hidden = !!data.models.length;
       byId("custom").required = !data.models.length;
       byId("custom").value = data.model || "";
     }
     byId("action").hidden = !!data.stage && !data.error;
-    byId("action").textContent = data.error ? "この段階を再試行" : "Codexで型番を調べる";
+    ui(byId("action"), data.error ? "この段階を再試行" : "Codexで型番を調べる");
     byId("action").onclick = () => refresh({action: data.error ? "retry" : "start"});
     if (["s2","ready"].includes(data.stage)) await loadGuide(data.stage === "ready");
     if (!data.error && ["models","s1","s2"].includes(data.stage)) timer = setTimeout(refresh, 2500);
   } catch (error) {
-    byId("status").textContent = error.message || "状態を読み取れませんでした。";
+    ui(byId("status"), error.message || "状態を読み取れませんでした。");
     byId("action").hidden = false;
-    byId("action").textContent = "再読み込み";
+    ui(byId("action"), "再読み込み");
     byId("action").onclick = () => location.reload();
   } finally {
     byId("action").disabled = byId("choose").querySelector("button").disabled = false;

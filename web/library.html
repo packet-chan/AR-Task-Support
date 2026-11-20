@@ -3,49 +3,51 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>機器一覧 | AR作業支援</title>
-  <link rel="stylesheet" href="/library.css">
-  <script src="/library.js" defer></script>
+  <title data-ui>機器一覧 | AR作業支援</title>
+  <link rel="stylesheet" href="/library.css?model-tiles">
+  <script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
+  <script type="module" src="/library.js?language"></script>
 </head>
 <body>
   <main>
     <header class="library-heading">
       <div>
-        <a class="switch-user" href="/" aria-label="ユーザーを切り替える"><strong id="participant"></strong> · 切り替え</a>
-        <h1>機器一覧</h1>
+        <a class="switch-user" href="/" aria-label="ユーザーを切り替える"><strong id="participant"></strong> · <span data-ui>切り替え</span></a>
+        <h1 data-ui>機器一覧</h1>
       </div>
+      <select id="locale" aria-label="表示言語"><option value="ja" lang="ja">日本語</option><option value="en" lang="en">English</option></select>
       <button type="button" class="add-device" id="add" aria-label="Add − 説明書PDFを追加" disabled>Add</button>
     </header>
     <p id="list-status" role="status"></p>
-    <button type="button" id="retry" class="btn" hidden>再取得</button>
+    <button type="button" id="retry" class="btn" hidden data-ui>再取得</button>
     <div class="grid" id="manuals"></div>
     <footer class="user-actions">
-      <button type="button" id="delete-user" disabled>ユーザーを削除</button>
+      <button type="button" id="delete-user" disabled data-ui>ユーザーを削除</button>
     </footer>
   </main>
   <dialog class="import-dialog" aria-labelledby="import-heading">
-    <h2 id="import-heading">説明書を追加</h2>
+    <h2 id="import-heading" data-ui>説明書を追加</h2>
     <form>
-      <label>説明書PDF<input type="file" accept=".pdf,application/pdf" required></label>
+      <label><span data-ui>説明書PDF</span> <input type="file" accept=".pdf,application/pdf" required></label>
       <fieldset hidden disabled>
-        <label>機器名<input type="text" name="device" required></label>
-        <label>型番の手掛かり（任意）<input type="text" name="model" maxlength="160"></label>
-        <p>登録後、CodexでPDFを読み取り、型番の候補を表示します。</p>
+        <label><span data-ui>機器名</span> <input type="text" name="device" required></label>
+        <label><span data-ui>型番の手掛かり（任意）</span> <input type="text" name="model" maxlength="160"></label>
+        <p data-ui>登録後、CodexでPDFを読み取り、型番の候補を表示します。</p>
       </fieldset>
       <p class="import-feedback" role="status"></p>
       <div class="actions">
-        <button type="button" id="cancel" class="btn">キャンセル</button>
-        <button type="submit" class="btn primary" disabled>追加</button>
+        <button type="button" id="cancel" class="btn" data-ui>キャンセル</button>
+        <button type="submit" class="btn primary" disabled data-ui>追加</button>
       </div>
     </form>
   </dialog>
   <dialog class="import-dialog" id="delete-dialog" aria-labelledby="delete-heading" aria-describedby="delete-description">
     <h2 id="delete-heading"></h2>
-    <p id="delete-description">このユーザーの機器情報・PDF・表紙・生成した作業支援をすべて削除します。この操作は取り消せません。</p>
+    <p id="delete-description" data-ui>このユーザーの機器情報・PDF・表紙・生成した作業支援をすべて削除します。この操作は取り消せません。</p>
     <p id="delete-error" role="alert"></p>
     <div class="actions">
-      <button type="button" id="keep-user" class="btn" autofocus>キャンセル</button>
-      <button type="button" id="confirm-delete" class="btn danger">削除する</button>
+      <button type="button" id="keep-user" class="btn" autofocus data-ui>キャンセル</button>
+      <button type="button" id="confirm-delete" class="btn danger" data-ui>削除する</button>
     </div>
   </dialog>
 </body>

@@ -3,18 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ユーザー選択 | AR作業支援</title>
+  <title data-ui>ユーザー選択 | AR作業支援</title>
   <link rel="stylesheet" href="/library.css">
+  <script type="module" src="/language.js"></script>
 </head>
 <body>
   <main class="entry">
-    <h1>ユーザー選択</h1>
+    <header class="entry-heading"><h1 data-ui>ユーザー選択</h1><select id="locale" aria-label="表示言語"><option value="ja" lang="ja">日本語</option><option value="en" lang="en">English</option></select></header>
     <form action="/enter" method="get">
-      <label for="user">ユーザーID</label>
+      <label for="user" data-ui>ユーザーID</label>
       <input type="text" id="user" name="id" placeholder="P1" required maxlength="32"
              autocomplete="off" autocapitalize="characters" spellcheck="false">
-      <p id="invalid" role="alert" hidden>このIDは使えません。P1のように半角英数字で始め、英数字・ハイフン・下線で入力してください。</p>
-      <button class="btn primary" type="submit">機器一覧を開く</button>
+      <p id="invalid" role="alert" hidden data-ui>このIDは使えません。P1のように半角英数字で始め、英数字・ハイフン・下線で入力してください。</p>
+      <button class="btn primary" type="submit" data-ui>機器一覧を開く</button>
     </form>
   </main>
   <script>

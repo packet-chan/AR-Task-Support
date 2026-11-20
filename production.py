@@ -1,10 +1,12 @@
 """Fixed PDF production stages. Only validated delivery files are published."""
 import json
 import math
+import os
 import re
 import shutil
 import struct
 import subprocess
+import sys
 import tempfile
 from collections import Counter
 from pathlib import Path
@@ -25,90 +27,124 @@ def read_json(path):
 
 def stage_root(database, generation, identifier, model):
     slug = re.sub(r"[^a-z0-9_-]+", "-", model.lower()).strip("-")[:48] or "device"
-    return database.parent / "devices" / generation / (slug + "-" + identifier)
+    return database.resolve().parent / "devices" / generation / (slug + "-" + identifier)
 
 
-def ask_stage(stage, work, pages, text):
+def import_workspace(database, generation, identifier, pdf):
+    root = database.resolve().parent / "devices" / generation / identifier
+    if root.is_dir():
+        return root
+    root.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=root.parent) as tmp:
+        work = Path(tmp) / "import"
+        (work / "S1/figure").mkdir(parents=True)
+        (work / "manual.pdf").write_bytes(pdf)
+        template = {"pdf_id": identifier, "model": "", "source_language": "", "parts_figures": [],
+                    "tasks": [{"id": "", "title": {"en": ""}, "precautions": [],
+                               "steps": [{"id": "", "text": {"en": ""}, "pages": [], "figures": []}]}]}
+        (work / "S1/task_step.json").write_text(json.dumps(template, indent=2), encoding="utf-8")
+        work.rename(root)
+    return root
+
+
+def select_workspace(database, generation, identifier, model, pdf):
+    root = stage_root(database, generation, identifier, model)
+    if not root.exists():
+        import_workspace(database, generation, identifier, pdf).rename(root)
+    guide_path = root / "S1/task_step.json"
+    guide = read_json(guide_path)
+    if guide["model"] != model:
+        guide["model"] = model
+        pending = guide_path.with_suffix(".tmp")
+        pending.write_text(json.dumps(guide, ensure_ascii=False, indent=2), encoding="utf-8")
+        pending.replace(guide_path)
+    return root
+
+
+def run_codex(work, prompt, options):
     cli = shutil.which("codex.exe") or shutil.which("codex")
     require(cli, "Codex CLIを配信PCに用意してください。")
-    prompt = (GENERATION / (stage + ".md")).read_text(encoding="utf-8")
-    inputs = read_json(work / "input.json")
-    images = pages.copy()
-    if stage == "s2":
-        inputs["guide"] = read_json(work / "S1/task_step.json")
-        images.extend(sorted((work / "S1/figure").glob("*.png")))
-    inputs["images_in_order"] = [p.relative_to(work).as_posix() for p in images]
-    inputs["pdf_pages"] = text.rstrip("\f").split("\f")
-    prompt += ("\nUse only the attached images and the input data below. "
-               "Do not run tools or access files. Return only the requested JSON object.\n")
-    args = [cli, "exec", "--ephemeral", "--ignore-user-config", "--skip-git-repo-check", "--sandbox",
-            "read-only", "--cd", str(work), "-o", "answer.json"]
-    for image in images:
-        args.extend(["-i", str(image.relative_to(work))])
-    result = subprocess.run([*args, "-"], input=(prompt + json.dumps(inputs, ensure_ascii=False)).encode(),
-                            cwd=work, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=3600)
+    args = [cli, "exec", "--ephemeral", "--ignore-user-config", "--skip-git-repo-check",
+            "--cd", str(work), *options, "-"]
+    result = subprocess.run(args, input=prompt.encode(), cwd=work, stdout=subprocess.DEVNULL,
+                            stderr=subprocess.PIPE, timeout=3600)
     require(result.returncode == 0, "Codexで生成できませんでした。CLIのログイン・接続・入力サイズを確認してください。")
-    return read_json(work / "answer.json")
 
 
-def write_guide(work, answer, pages, render):
-    folder = work / "S1"
-    (folder / "figure").mkdir(parents=True)
-    for crop in answer["crops"]:
-        name, box = crop["file"], crop["box"]
-        require(isinstance(name, str) and FIGURE.fullmatch(name), "切り抜きのファイル名が不正です。")
-        page = int(name.split("-")[0][1:])
-        require(1 <= page <= len(pages) and len(box) == 4 and
-                all(type(v) in (int, float) and 0 <= v <= 1 for v in box)
-                and box[0] < box[2] and box[1] < box[3], "切り抜き位置が不正です。")
-        with pages[page - 1].open("rb") as f:
-            f.seek(16)
-            w, h = struct.unpack(">II", f.read(8))
-        x, y = int(box[0] * w), int(box[1] * h)
-        render("-f", str(page), "-l", str(page), "-singlefile", "-x", str(x), "-y", str(y),
-               "-W", str(math.ceil(box[2] * w) - x), "-H", str(math.ceil(box[3] * h) - y),
-               "-png", "manual.pdf", str(folder / "figure" / name[:-4]))
-    guide = answer["guide"]
-    for task in guide["tasks"]:
-        for step in task["steps"]:
-            require(all(type(p) is int and 1 <= p <= len(pages) for p in step["pages"]),
-                    "出典ページがPDFの範囲外です。")
-    (folder / "task_step.json").write_text(json.dumps(guide, ensure_ascii=False), encoding="utf-8")
+MANUAL_TOOLS = {
+    "s1": ("read_manual", "view_page", "save_figures", "save_guide"),
+    "s2": ("read_manual", "view_page", "view_figure", "read_bindings", "save_bindings", "save_model"),
+}
 
 
-def build_model(work, answer):
+def prepare_bindings(root):
+    path = root / "S2/bindings.json"
+    if path.exists():
+        return  # Resume with any edits already saved by Astra.
+    guide = read_json(root / "S1/task_step.json")
+    steps = {step["id"]: {"target_part": None, "clips": []}
+             for task in guide["tasks"] for step in task["steps"]}
+    path.parent.mkdir(exist_ok=True)
+    pending = path.with_suffix(".tmp")
+    pending.write_text(json.dumps({"parts": {}, "steps": steps, "notes": []}, indent=2, ensure_ascii=False),
+                       encoding="utf-8")
+    pending.replace(path)
+
+
+def build_model(work, scene):
     node = shutil.which("node")
     require(node, "GLBの作成にNode.jsが必要です。")
     folder = work / "S2"
-    folder.mkdir()
-    builder = GENERATION / "build-model.mjs"
-    built = subprocess.run([node, str(builder), str(work / "answer.json"), str(folder / "model.glb")],
-                           capture_output=True, timeout=120)
-    require(built.returncode == 0, "モデルの形状・動作の組立に失敗しました。Three.jsの導入状態も確認してください。")
-    (folder / "bindings.json").write_text(json.dumps(answer["bindings"], ensure_ascii=False), encoding="utf-8")
+    with tempfile.TemporaryDirectory(dir=folder) as tmp:
+        source = Path(tmp) / "scene.json"
+        source.write_text(json.dumps({"scene": scene}), encoding="utf-8")
+        model = Path(tmp) / "model.glb"
+        built = subprocess.run([node, str(GENERATION / "build-model.mjs"), str(source), str(model)],
+                               capture_output=True, timeout=120)
+        require(built.returncode == 0, "モデルの形状・動作の組立に失敗しました。" +
+                built.stderr.decode("utf-8", errors="replace")[-1200:])
+        model.replace(folder / "model.glb")
 
 
 def run_generator(stage, work):
+    if stage in MANUAL_TOOLS:
+        page_count = None
+        if stage == "s1":
+            info = subprocess.run(["pdfinfo", "manual.pdf"], cwd=work, capture_output=True, timeout=120, check=True)
+            pages = re.search(rb"^Pages:\s*(\d+)", info.stdout, re.MULTILINE)
+            require(pages, "PDFのページ数を取得できませんでした。")
+            page_count = int(pages[1])
+        runtime = GENERATION.parent / ".local/s1-runtime" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+        python = str(runtime) if runtime.is_file() else sys.executable
+        tool_args = [str(GENERATION / "manual_tools.py"), str(work.resolve()), stage]
+        options = ["--model", "gpt-6.2-astra", "--sandbox", "read-only", "--disable", "shell_tool",
+                   "-c", "mcp_servers.manual.command=" + json.dumps(python, ensure_ascii=False),
+                   "-c", "mcp_servers.manual.args=" + json.dumps(tool_args, ensure_ascii=False),
+                   "-c", "mcp_servers.manual.required=true"]
+        for tool in MANUAL_TOOLS[stage]:
+            options.extend(["-c", f'mcp_servers.manual.tools.{tool}.approval_mode="approve"'])
+        run_codex(work, (GENERATION / (stage + ".md")).read_text(encoding="utf-8"), options)
+        return page_count
+
     renderer, extractor = shutil.which("pdftoppm"), shutil.which("pdftotext")
     require(renderer and extractor, "配信PCにPoppler（pdftoppm・pdftotext）が必要です。")
-
-    def render(*args):
-        subprocess.run([renderer, "-scale-to", "1400", *args], cwd=work, capture_output=True,
-                       timeout=240, check=True)
-
-    render("-png", "manual.pdf", "page")
+    subprocess.run([renderer, "-scale-to", "1400", "-png", "manual.pdf", "page"],
+                   cwd=work, capture_output=True, timeout=240, check=True)
     pages = sorted(work.glob("page-*.png"), key=lambda p: int(p.stem.split("-")[1]))
     require(pages, "PDFを画像化できませんでした。")
     text = subprocess.run([extractor, "-layout", "-enc", "UTF-8", "manual.pdf", "-"],
                           cwd=work, capture_output=True, timeout=120, check=True).stdout.decode("utf-8")
-    answer = ask_stage(stage, work, pages, text)
-    if stage == "models":
-        require(all(type(row["page"]) is int and 1 <= row["page"] <= len(pages) for row in answer["models"]),
-                "型番候補の出典ページが範囲外です。")
-    elif stage == "s1":
-        write_guide(work, answer, pages, render)
-    else:
-        build_model(work, answer)
+    inputs = read_json(work / "input.json")
+    inputs["images_in_order"] = [p.name for p in pages]
+    inputs["pdf_pages"] = text.rstrip("\f").split("\f")
+    prompt = (GENERATION / "models.md").read_text(encoding="utf-8")
+    prompt += ("\nUse only the attached images and the input data below. "
+               "Do not run tools or access files. Return only the requested JSON object.\n")
+    args = ["--sandbox", "read-only", "-o", "answer.json"]
+    for page in pages:
+        args.extend(["-i", page.name])
+    run_codex(work, prompt + json.dumps(inputs, ensure_ascii=False), args)
+    require(all(row["page"] <= len(pages) for row in candidates(work)), "型番候補の出典ページが範囲外です。")
 
 
 def regular(path):
@@ -139,7 +175,7 @@ def candidates(work):
     return rows
 
 
-def check_s1(folder, identifier, model):
+def check_s1(folder, identifier, model, page_count=None):
     guide = read_json(regular(folder / "task_step.json"))
     require(guide["pdf_id"] == identifier and guide["model"] == model, "PDFまたは型番が一致しません。")
     lang = guide["source_language"]
@@ -156,14 +192,19 @@ def check_s1(folder, identifier, model):
         require(nonempty(task["id"]) and task["id"] not in task_ids and nonempty(task["title"][lang]),
                 "作業IDか原文タイトルが不正です。")
         task_ids.add(task["id"])
+        precautions = task.get("precautions", [])
+        require(isinstance(precautions, list), "作業前の注意は配列で指定してください。")
         require(isinstance(task["steps"], list) and task["steps"], "手順がありません。")
-        for step in task["steps"]:
-            require(nonempty(step["id"]) and step["id"] not in step_ids and nonempty(step["text"][lang]),
-                    "手順IDか原文が不正です。")
-            step_ids.add(step["id"])
-            pages = step["pages"]
+        for item in [*precautions, *task["steps"]]:
+            require(isinstance(item, dict) and isinstance(item.get("text"), dict) and nonempty(item["text"].get(lang)),
+                    "注意・手順に原文が必要です。")
+            pages = item.get("pages")
             require(isinstance(pages, list) and pages and all(type(p) is int and p > 0 for p in pages),
-                    "手順に出典ページが必要です。")
+                    "注意・手順に出典ページが必要です。")
+            require(page_count is None or max(pages) <= page_count, "出典ページがPDFの範囲外です。")
+        for step in task["steps"]:
+            require(nonempty(step["id"]) and step["id"] not in step_ids, "手順IDが不正です。")
+            step_ids.add(step["id"])
             figures(step["figures"])
     directory(folder / "figure")
     for name in images:
@@ -210,32 +251,10 @@ def check_s2(folder, step_ids, images):
     for step in steps.values():
         target, clips = step["target_part"], step["clips"]
         require(set(step) == {"target_part", "clips"} and (target is None or target in parts)
-                and isinstance(clips, list) and all(target and c in parts[target]["clips"] for c in clips),
+                and isinstance(clips, list) and all(target and animations[c] == 1 for c in clips),
                 "対象部品か手順クリップが不正です。")
     require(isinstance(data["notes"], list), "確認メモの形式が不正です。")
     for note in data["notes"]:
         require(nonempty(note["text"]) and ("part" in note or "step" in note)
                 and ("part" not in note or note["part"] in parts)
                 and ("step" not in note or note["step"] in steps), "確認メモの対象が不正です。")
-
-
-def prepare(stage, work, pdf, inputs, root):
-    (work / "manual.pdf").write_bytes(pdf)
-    (work / "input.json").write_text(json.dumps(inputs, ensure_ascii=False), encoding="utf-8")
-    if stage == "s2":
-        shutil.copytree(root / "S1", work / "S1")
-
-
-def publish(root, stage, source, files):
-    root.mkdir(parents=True, exist_ok=True)
-    target = root / stage
-    if target.exists():
-        return  # A crash may have published the stage before its DB commit.
-    with tempfile.TemporaryDirectory(dir=root) as temp:
-        delivery = Path(temp) / stage
-        delivery.mkdir()
-        if stage == "S1":
-            (delivery / "figure").mkdir()
-        for name in files:
-            shutil.copyfile(source / name, delivery / name)
-        delivery.rename(target)

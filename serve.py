@@ -6,7 +6,7 @@ import shutil
 import sqlite3
 import subprocess
 import tempfile
-from contextlib import closing
+from contextlib import closing, nullcontext
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PureWindowsPath
@@ -81,32 +81,41 @@ def produce(path, token, identifier):
             stage, name, model, pdf = row
             root = prod.stage_root(path, token, identifier, model)
             try:
-                with tempfile.TemporaryDirectory(prefix="manual-stage-") as temp:
+                with (tempfile.TemporaryDirectory(prefix="manual-stage-") if stage == "models" else nullcontext(root)) as temp:
                     work = Path(temp)
                     inputs = {"pdf_id": identifier, "name": name, "model": model}
                     with library_lock:
-                        prod.prepare(stage, work, pdf, inputs, root)
-                    prod.run_generator(stage, work)
-                    choices, files = [], []
+                        if stage == "models":
+                            (work / "manual.pdf").write_bytes(pdf)
+                            (work / "input.json").write_text(json.dumps(inputs, ensure_ascii=False), encoding="utf-8")
+                        else:
+                            with closing(open_library(path)) as db:
+                                if not still_current(db, token, identifier, stage):
+                                    return
+                            if stage == "s1":
+                                prod.select_workspace(path, token, identifier, model, pdf)
+                            else:
+                                if not (root / "manual.pdf").exists():
+                                    (root / "manual.pdf").write_bytes(pdf)
+                                prod.prepare_bindings(root)  # Also resume S2 imports created before templates existed.
+                    page_count = prod.run_generator(stage, work)
+                    choices = []
                     if stage == "models":
                         choices = prod.candidates(work)
                         next_stage = "select"
                     elif stage == "s1":
                         folder = prod.directory(work / "S1")
-                        _, images = prod.check_s1(folder, identifier, model)
-                        files = ["task_step.json", *("figure/" + image for image in images)]
+                        prod.check_s1(folder, identifier, model, page_count)
                         next_stage = "s2"
                     else:
                         folder = prod.directory(work / "S2")
-                        # Validate against published S1, not a generator-modified copy.
                         prod.check_s2(folder, *prod.check_s1(root / "S1", identifier, model))
-                        files = ["bindings.json", "model.glb"]
                         next_stage = "ready"
                     with library_lock, closing(open_library(path)) as db, db:
                         if not still_current(db, token, identifier, stage):
                             return
-                        if files:
-                            prod.publish(root, stage.upper(), folder, files)
+                        if next_stage == "s2":
+                            prod.prepare_bindings(root)
                         db.execute("UPDATE production SET stage=?, candidates=? WHERE id=?",
                                    (next_stage, json.dumps(choices, ensure_ascii=False), identifier))
             except Exception as exc:
@@ -155,6 +164,10 @@ class Library(SimpleHTTPRequestHandler):
 
     def end_headers(self):
         self.send_header("X-Content-Type-Options", "nosniff")
+        if getattr(self, "path", "").partition("?")[0] in {
+            "/support.html", "/support.css", "/support.js", "/viewer.js", "/quest-controls.svg", "/quest-lock.png"
+        }:
+            self.send_header("Cache-Control", "no-cache")
         super().end_headers()
 
     def json_response(self, status, data, generation=None):
@@ -265,11 +278,15 @@ class Library(SimpleHTTPRequestHandler):
                            (identifier, name, model, pdf, cover))
                 if self.headers.get("X-Production") == "v1":
                     db.execute("INSERT OR IGNORE INTO production(id,stage) VALUES (?,'models')", (identifier,))
-                    schedule(library_path(self.server.database, match[1]),
-                             db.execute("SELECT generation FROM identity").fetchone()[0], identifier)
+                    token = db.execute("SELECT generation FROM identity").fetchone()[0]
+                    path = library_path(self.server.database, match[1])
+                    if db.execute("SELECT stage FROM production WHERE id=?", (identifier,)).fetchone()[0] in ("models", "select"):
+                        original = db.execute("SELECT pdf FROM manuals WHERE id=?", (identifier,)).fetchone()[0]
+                        prod.import_workspace(path, token, identifier, original)
+                    schedule(path, token, identifier)
         except FileNotFoundError:
             return self.json_response(404, {"error": "ユーザーは削除されました。"})
-        except sqlite3.Error:
+        except (sqlite3.Error, OSError):
             return self.json_response(503, {"error": "保存できませんでした。もう一度追加してください。"})
         self.json_response(201, {"id": identifier})
 
@@ -309,6 +326,8 @@ class Library(SimpleHTTPRequestHandler):
                     command = action.get("action")
                     if command == "start" and not stage:
                         stage = "models"
+                        prod.import_workspace(path, token, identifier,
+                                              db.execute("SELECT pdf FROM manuals WHERE id=?", (identifier,)).fetchone()[0])
                         db.execute("INSERT INTO production(id,stage) VALUES (?,?)", (identifier, stage))
                     elif command == "select" and stage == "select":
                         selected = action.get("model")
@@ -318,6 +337,8 @@ class Library(SimpleHTTPRequestHandler):
                         if choices and model not in {item["model"] for item in choices}:
                             return self.json_response(400, {"error": "候補から型番を選んでください。"})
                         stage = "s1"
+                        prod.select_workspace(path, token, identifier, model,
+                                              db.execute("SELECT pdf FROM manuals WHERE id=?", (identifier,)).fetchone()[0])
                         db.execute("UPDATE manuals SET model=? WHERE id=?", (model, identifier))
                         db.execute("UPDATE production SET stage=? WHERE id=?", (stage, identifier))
                     elif command == "retry" and error:

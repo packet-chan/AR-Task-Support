@@ -55,6 +55,7 @@ p { margin: 0 0 18px; }
   object-fit: contain;
   mix-blend-mode: multiply;
 }
+.picture canvas { display: block; width: 100%; height: 100%; position: absolute; inset: 0; object-fit: contain; }
 .body { display: grid; gap: 3px; padding: 13px 2px 8px; overflow-wrap: anywhere; }
 .body strong { font: 650 clamp(1.38rem, 2.2vw, 1.75rem)/1.25 "Instrument Sans", "Segoe UI", sans-serif; letter-spacing: -.035em; }
 .tile:hover .picture { box-shadow: inset 0 0 0 2px #84938b; }
@@ -75,6 +76,10 @@ button { color: inherit; font: inherit; cursor: pointer; touch-action: manipulat
 .model-number { color: #52605a; font-variant-numeric: tabular-nums; text-wrap: pretty; }
 .library-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: clamp(26px,4vw,52px); }
 .library-heading h1 { margin: 0; }
+.library-heading > div { margin-right: auto; }
+.entry-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 1.5rem; }
+.entry-heading h1 { margin: 0; }
+#locale { font: inherit; font-size: .85rem; color: inherit; background: transparent; border: 1px solid #acb6ae; border-radius: 6px; padding: 5px; min-height: 36px; cursor: pointer; }
 .add-device {
   display: inline-flex; gap: 10px; align-items: center; justify-content: center; min-height: 48px;
   padding: 0 20px; border: 0; border-radius: 24px; background: #254d40; color: #fff; font-weight: 600;
@@ -102,6 +107,7 @@ button { color: inherit; font: inherit; cursor: pointer; touch-action: manipulat
 #list-status:empty { display: none; }
 .support-link { display: inline-block; margin: 0 0 8px 57px; color: #245a49; text-underline-offset: 4px; }
 @media (max-width: 560px) {
+  .library-heading { gap: 8px; flex-wrap: wrap; }
   .grid { gap: 20px; }
   .tile { --rail: 34px; --gap: 10px; }
   .picture { aspect-ratio: 1.7; }

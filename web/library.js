@@ -1,6 +1,8 @@
+import {ui} from "./language.js";
+
 const participant = location.pathname.split("/")[2];
 document.querySelector("#participant").textContent = participant;
-document.title = participant + " の機器一覧 | AR作業支援";
+ui(document.querySelector("title"), "{user} の機器一覧 | AR作業支援", {user: participant});
 const userApi = "/api/users/" + encodeURIComponent(participant);
 const api = userApi + "/manuals";
 const list = document.querySelector("#manuals");
@@ -24,8 +26,8 @@ const deleteError = document.querySelector("#delete-error");
 const addButton = document.querySelector("#add");
 
 deleteButton.onclick = () => {
-  document.querySelector("#delete-heading").textContent = participant + " を削除しますか？";
-  deleteError.textContent = "";
+  ui(document.querySelector("#delete-heading"), "{user} を削除しますか？", {user: participant});
+  ui(deleteError, "");
   deleteDialog.dataset.generation = generation;
   deleteDialog.showModal();
   keepButton.focus();
@@ -35,11 +37,11 @@ deleteDialog.oncancel = event => { if (confirmDelete.disabled) event.preventDefa
 confirmDelete.onclick = async () => {
   if (confirmDelete.disabled) return;
   confirmDelete.disabled = keepButton.disabled = true;
-  deleteError.textContent = "";
+  ui(deleteError, "");
   try {
     const response = await fetch(userApi, {method: "DELETE", headers: {"X-Library-Generation": deleteDialog.dataset.generation}});
     if (response.status === 409) {
-      deleteError.textContent = "ユーザー情報が変わりました。一覧を開き直してください。";
+      ui(deleteError, "ユーザー情報が変わりました。一覧を開き直してください。");
     } else if (!response.ok) {
       throw new Error();
     } else {
@@ -47,7 +49,7 @@ confirmDelete.onclick = async () => {
       return;
     }
   } catch {
-    deleteError.textContent = "削除できませんでした。配信PCへの接続を確認してください。";
+    ui(deleteError, "削除できませんでした。配信PCへの接続を確認してください。");
   }
   confirmDelete.disabled = keepButton.disabled = false;
 };
@@ -68,21 +70,24 @@ const milestones = [
 function manualTile({id, name, model, cover, stage, failed}) {
   const tile = element("a", "tile");
   const base = api + "/" + encodeURIComponent(id);
-  tile.href = base + "/pdf";
-  tile.target = "_blank";
-  tile.rel = "noopener";
+  tile.href = "/support.html?" + new URLSearchParams({user: participant, id});
   tile.dataset.id = id;
-  tile.setAttribute("aria-label", [name, model, "PDF取込済み", "PDFを開く"].filter(Boolean).join("、"));
+  const labels = {models: "型番を確認中", select: "型番を選ぶ", s1: "手順と図を抽出中",
+    s2: "初版モデルを作成中", ready: "作業支援を開く"};
+  const action = failed ? "生成状況を確認" : labels[stage] || "作業支援を作成";
+  tile.setAttribute("aria-label", [name, model].filter(Boolean).join(" "));
+  ui(tile, action, {}, "aria-description");
   const row = element("span", "tile-row");
   const rail = element("span", "rail");
   rail.setAttribute("aria-hidden", "true");
   milestones.forEach(([label, path], index) => {
     const dot = element("span", index === 0 ? "milestone current" : "milestone");
-    dot.title = label;
+    ui(dot, label, {}, "title");
     dot.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round">' + path + '</svg>';
     rail.append(dot);
   });
   const picture = element("span", "picture");
+  if (stage === "ready") picture.dataset.glb = base + "/workflow/S2/model.glb";
   if (cover) {
     const img = element("img");
     img.src = base + "/cover";
@@ -97,13 +102,20 @@ function manualTile({id, name, model, cover, stage, failed}) {
   const caption = element("span", "body");
   caption.append(element("strong", "", name));
   if (model) caption.append(element("span", "model-number", model));
+  if (stage !== "ready" || failed) {
+    const status = element("span", "model-number");
+    ui(status, action);
+    caption.append(status);
+  }
   tile.append(row, caption);
   const item = element("article");
-  const labels = {models: "型番を確認中", select: "型番を選ぶ", s1: "手順と図を抽出中",
-    s2: "初版モデルを作成中", ready: "初版の作業支援を開く"};
-  const support = element("a", "support-link", failed ? "生成状況を確認" : labels[stage] || "作業支援を作成");
-  support.href = "/support.html?" + new URLSearchParams({user: participant, id});
-  item.append(tile, support);
+  const pdf = element("a", "support-link");
+  ui(pdf, "元PDFを開く");
+  pdf.href = base + "/pdf";
+  pdf.target = "_blank";
+  pdf.rel = "noopener";
+  ui(pdf, "{name}の元PDFを開く", {name}, "aria-label");
+  item.append(tile, pdf);
   return item;
 }
 
@@ -118,11 +130,16 @@ async function refresh(focusId) {
     generation = response.headers.get("X-Library-Generation");
     deleteButton.disabled = addButton.disabled = !generation;
     list.replaceChildren(...rows.map(manualTile));
-    listStatus.textContent = rows.length ? "" : "まだ機器が登録されていません。";
+    const pictures = list.querySelectorAll("[data-glb]");
+    if (pictures.length) {
+      import("./viewer.js?model-tiles").then(module => module.showModelThumbnails(pictures))
+        .catch(error => console.warn("サムネイルには説明書の表紙を使用します。", error));
+    }
+    ui(listStatus, rows.length ? "" : "まだ機器が登録されていません。");
     if (focusId) list.querySelector('[data-id="' + CSS.escape(focusId) + '"]')?.focus();
   } catch {
     if (request !== listRequest) return;
-    listStatus.textContent = "機器一覧を読み込めませんでした。";
+    ui(listStatus, "機器一覧を読み込めませんでした。");
     retry.hidden = false;
   }
 }
@@ -130,7 +147,7 @@ async function refresh(focusId) {
 addButton.onclick = () => {
   form.reset();
   metadata.hidden = metadata.disabled = submit.disabled = true;
-  feedback.textContent = "";
+  ui(feedback, "");
   dialog.showModal();
   file.focus();
 };
@@ -138,7 +155,7 @@ file.onchange = () => {
   const pdf = file.files[0];
   metadata.hidden = metadata.disabled = submit.disabled = !pdf;
   form.elements.device.value = pdf ? pdf.name.replace(/\.pdf$/i, "") : "";
-  feedback.textContent = "";
+  ui(feedback, "");
   importId = crypto.randomUUID();
 };
 cancel.onclick = () => dialog.close();
@@ -150,7 +167,7 @@ form.onsubmit = async event => {
   if (!pdf || file.disabled) return;
   if (!name) { form.elements.device.focus(); return; }
   file.disabled = metadata.disabled = submit.disabled = cancel.disabled = true;
-  feedback.textContent = "取り込み中…";
+  ui(feedback, "取り込み中…");
   let savedId;
   try {
     const response = await fetch(api, {method: "POST", headers: {
@@ -165,8 +182,8 @@ form.onsubmit = async event => {
     if (!response.ok) throw new Error(result.error || "保存できませんでした。");
     savedId = result.id;
   } catch (error) {
-    feedback.textContent = error instanceof TypeError || error instanceof SyntaxError
-      ? "配信PCに接続できませんでした。もう一度お試しください。" : error.message;
+    ui(feedback, error instanceof TypeError || error instanceof SyntaxError
+      ? "配信PCに接続できませんでした。もう一度お試しください。" : error.message);
   } finally {
     file.disabled = metadata.disabled = submit.disabled = cancel.disabled = false;
   }
