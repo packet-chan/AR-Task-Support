@@ -1,3 +1,4 @@
+import {modelMotion} from "./model-motion.js";
 import * as THREE from "three";
 import {GLTFLoader} from "three/addons/loaders/GLTFLoader.js";
 import {OrbitControls} from "three/addons/controls/OrbitControls.js";
@@ -76,31 +77,10 @@ export async function loadViewer(url) {
   controls.target.copy(center);
   controls.update();
 
-  const mixer = new THREE.AnimationMixer(gltf.scene);
-  const clips = new Map(gltf.animations.map(clip => [clip.name, clip]));
-  const nodes = new Map();
-  gltf.scene.traverse(node => {
-    const index = gltf.parser.associations.get(node)?.nodes;
-    if (index !== undefined) nodes.set(gltf.parser.json.nodes[index].name, node);
-  });
-  let target, queue = [], sequence = [], action, highlight;
+  const {nodes, mixer, play} = modelMotion(gltf);
+  let target, sequence = [], highlight;
   const point = new THREE.Vector3();
-  function advance() {
-    if (!queue.length) return;
-    action?.stop();
-    action = mixer.clipAction(clips.get(queue.shift()));
-    action.reset().setLoop(THREE.LoopOnce, 1);
-    action.clampWhenFinished = true;
-    action.play();
-  }
-  mixer.addEventListener("finished", advance);
-  function replay() {
-    mixer.stopAllAction();
-    action = null;
-    queue = [...sequence];
-    advance();
-  }
-
+  function replay() { play(sequence); }
   function select(part, orderedClips) {
     if (highlight) {
       scene.remove(highlight);

@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.glb binary
+*.png binary
+
+# These two S4 v1 inputs contain mixed line endings. Published rounds hash their exact bytes.
+docs/s4.md -text whitespace=trailing-space,space-before-tab,cr-at-eol
+web/model-motion.js -text whitespace=trailing-space,space-before-tab,cr-at-eol

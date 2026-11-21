@@ -1,5 +1,7 @@
 {
+  "type": "module",
   "dependencies": {
+    "qrcode-generator": "1.4.4",
     "three": "0.180.0"
   }
 }

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>S4 改訂前後の比較</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f5f4ef;color:#242e29;font:16px system-ui,sans-serif}
+main{max-width:1250px;margin:auto;padding:20px}h1{font-size:22px;margin:0 0 12px}
+section{display:grid;grid-template-columns:1fr 1fr;gap:8px}figure{margin:0;background:#e5e7e2}
+figcaption{padding:8px 14px;font-weight:bold}canvas{display:block;width:100%;height:clamp(220px,52vh,520px)}
+label,button,select{margin:6px 6px 6px 0;font:inherit}input{width:min(45vw,460px);vertical-align:middle}
+</style><script type="importmap">IMPORT_MAP</script>
+<main><h1></h1><label>STEP <select></select></label><p id="instruction"></p>
+<section><figure><figcaption>改訂前</figcaption><canvas></canvas></figure><figure><figcaption>改訂後</figcaption><canvas></canvas></figure></section>
+<button>最初から再生</button><label>再生位置 <input type="range" min="0" max="1" step=".001" value="0"></label><output></output>
+<p id="note"></p></main><script type="module">
+import * as T from "three";
+import {GLTFLoader} from "loader";
+import {modelMotion} from "motion";
+const payload=PAYLOAD, loader=new GLTFLoader(), select=document.querySelector("select"), slider=document.querySelector("input");
+document.querySelector("h1").textContent=payload.model+"　撮影に基づくモデル改訂";
+const views=await Promise.all(payload.versions.map(async (v,i)=>{
+ const bytes=Uint8Array.from(atob(v.glb),c=>c.charCodeAt(0));
+ const g=await loader.parseAsync(bytes.buffer,""), scene=new T.Scene();
+ scene.background=new T.Color(0xe5e7e2);scene.add(g.scene,new T.HemisphereLight(0xffffff,0x74766c,2.2));
+ const light=new T.DirectionalLight(0xffffff,2.4);light.position.set(-2,4,3);scene.add(light);
+ const renderer=new T.WebGLRenderer({canvas:document.querySelectorAll("canvas")[i],antialias:true});
+ const camera=new T.PerspectiveCamera(36,1,.001,100);
+ return {motion:modelMotion(g),dur:new Map(g.animations.map(a=>[a.name,a.duration])),bindings:v.steps,scene,renderer,camera};
+}));
+const bounds=new T.Box3().setFromObject(views[0].scene),center=bounds.getCenter(new T.Vector3()),span=bounds.getSize(new T.Vector3()).length()||1;
+center.y+=span*.055;
+for(const v of views){v.camera.position.copy(center).addScaledVector(new T.Vector3(-.65,.8,1.15).normalize(),span*1.65);v.camera.lookAt(center)}
+let elapsed=0,running=false,prev=0,total=0;
+for (const s of payload.steps) select.add(new Option(s.id+"　"+s.title,s.id));
+select.value=payload.first;
+function reset(){
+ elapsed=0;total=0;
+ for(const v of views){const clips=v.bindings[select.value].clips;v.motion.play(clips);total=Math.max(total,clips.reduce((t,c)=>t+v.dur.get(c),0))}
+ document.querySelector("#instruction").textContent=payload.steps.find(s=>s.id===select.value).text;
+}
+function advance(to){while(elapsed<to){const dt=Math.min(to-elapsed,1/120);for(const v of views)v.motion.mixer.update(dt);elapsed+=dt}}
+function render(){
+ for(const {renderer,camera,scene} of views){const c=renderer.domElement,w=c.clientWidth,h=c.clientHeight;
+ if(c.width!==w||c.height!==h){renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}renderer.render(scene,camera)}
+ slider.value=total?elapsed/total:0;document.querySelector("output").textContent=elapsed.toFixed(2)+" 秒";
+}
+function frame(now){if(running){advance(Math.min(total,elapsed+Math.min(.1,(now-prev)/1000)));running=elapsed<total;render()}prev=now;requestAnimationFrame(frame)}
+select.onchange=()=>{running=false;reset();render()};
+slider.oninput=()=>{const pos=+slider.value;running=false;reset();advance(pos*total);render()};
+document.querySelector("button").onclick=()=>{reset();running=true;prev=performance.now()};
+window.addEventListener("resize",render);
+reset();advance(Math.min(total,total ? views[0].dur.get(views[0].bindings[select.value].clips[0])*.98 : 0));render();
+document.querySelector("#note").textContent="両側は同じ視点です。スライダーで任意の時点を比較できます。";
+requestAnimationFrame(frame);
+</script></html>

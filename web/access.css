@@ -1,0 +1,67 @@
+.host-entry {
+  --ink: #18382e;
+  --forest: #205441;
+  --line: #c6d2ca;
+  --muted: #52645b;
+  max-width: 1160px;
+  padding: clamp(24px, 4.5vw, 64px) clamp(16px, 4vw, 56px);
+}
+.host-entry .entry-heading { padding-bottom: 20px; border-bottom: 2px solid var(--ink); margin-bottom: 18px; }
+.host-entry h1 { font-size: clamp(2rem, 4vw, 3.35rem); color: var(--ink); }
+.host-entry .user-entry { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.host-entry .user-entry label { font-weight: 650; font-size: .9rem; }
+.host-entry .user-entry input { width: 14rem; }
+.entry #capture-live { width: 1.15rem; min-height: 1.15rem; vertical-align: middle; }
+.host-entry .user-entry .primary { margin: 0; }
+.host-entry #invalid { flex-basis: 100%; order: 1; }
+.host-entry #host-pairing { margin-top: clamp(30px, 5vw, 64px); }
+.manager-heading, .role-heading, .device-heading, .device-actions { display: flex; align-items: center; gap: .75rem; }
+.manager-heading, .role-heading, .device-heading { justify-content: space-between; }
+.manager-heading { margin-bottom: 14px; }
+.manager-heading h2, .role-heading h3 { margin: 0; line-height: 1.3; }
+.manager-heading h2 { font-size: clamp(1.2rem, 2vw, 1.55rem); color: var(--ink); }
+.role-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(16px, 2.5vw, 32px); }
+.role-group {
+  --accent: var(--forest);
+  min-width: 0; align-self: start; padding: clamp(16px, 2.1vw, 26px);
+  border: 1px solid var(--line); border-top: 5px solid var(--accent);
+  border-radius: 5px 5px 12px 12px; background: #fff;
+}
+.personal-group { --accent: #354b63; }
+#pending-section { padding: .8rem; margin-top: 1rem; background: #f2f5f8; border-radius: 6px; }
+#pending-section h4 { margin: 0; }
+.host-entry #device-manager #pending-devices { margin-top: .5rem; }
+.role-heading h3 { color: var(--accent); font-size: clamp(1.5rem, 2.7vw, 2.2rem); }
+.role-heading span { color: var(--accent); font-weight: 650; font-variant-numeric: tabular-nums; }
+.scope-note { color: var(--muted); margin: .5rem 0 1rem; font-size: .9rem; }
+.host-entry #venue-controls:not([hidden]) { display: grid; justify-items: start; margin: 0; gap: .5rem; }
+.host-entry #venue-controls output:empty, #device-feedback:empty, .edit-error:empty { display: none; }
+.host-entry #venue-code { background: var(--forest); color: #fff; border-color: var(--forest); }
+.host-entry #personal-pairing summary { cursor: pointer; padding: .6rem .85rem; width: fit-content; border: 1px solid #8997a6; border-radius: 7px; color: var(--accent); }
+.host-entry #personal-pairing[open] > p { font-size: .9rem; margin: .8rem 0; }
+.host-entry #venue-result, .host-entry #device-status { font-size: .84rem; color: var(--muted); }
+.host-entry #device-manager ul { padding: 0; margin: 20px 0 0; list-style: none; }
+.host-entry #device-manager li { padding: 16px 0; border-top: 1px solid var(--line); }
+.host-entry #device-manager li:last-child { padding-bottom: 0; }
+.device-heading { align-items: baseline; flex-wrap: wrap; gap: .2rem .7rem; }
+.device-heading strong { font-size: 1.1rem; overflow-wrap: anywhere; }
+.device-kind, .device-empty { color: var(--muted); font-size: .85rem; }
+.device-meta { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px .75rem; margin: .55rem 0 .35rem; font-size: .84rem; }
+.device-meta dt { color: var(--muted); }
+.device-meta dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.host-entry .quiet { min-height: 36px; padding: .2rem .1rem; background: transparent; border: 0; color: var(--forest); font-size: .85rem; text-underline-offset: .22em; }
+.host-entry .quiet:hover { text-decoration: underline; }
+.host-entry .revoke { color: #804338; }
+.host-entry #venue-end { margin-top: 1rem; }
+.device-actions { gap: 1rem; }
+.host-entry #edit-device form { display: grid; }
+#device-feedback:not(:empty), .edit-error { color: #883c32; margin: .7rem 0; }
+@media (max-width: 720px) {
+  .role-columns { grid-template-columns: minmax(0, 1fr); }
+  .host-entry .user-entry input { flex: 1 1 8rem; max-width: 100%; }
+}
+@media (max-width: 460px) {
+  .host-entry .user-entry label { flex-basis: 100%; }
+  .host-entry .user-entry input { width: 6rem; }
+  .host-entry .user-entry .primary { padding-inline: 12px; }
+}

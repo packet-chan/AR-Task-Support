@@ -8,8 +8,20 @@
 body { margin: 0; }
 .entry { max-width: 540px; margin-inline: auto; }
 .entry form { display: grid; gap: 12px; }
+#host-pairing { margin-top: 2rem; }
+#venue-controls:not([hidden]) { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-block: 1rem; }
+#venue-result { font-variant-numeric: tabular-nums; }
+#venue-qr, #device-qr { width: min(100%, 360px); height: auto; image-rendering: pixelated; }
+.add-device:disabled { opacity: .45; cursor: default; }
+.tile:has(.rail[hidden]) .tile-row { display: block; }
+.tile:has(.rail[hidden]) .body { padding-left: 0; }
+.rail[hidden], #add[hidden] { display: none; }
+#device-status:not(:empty), #device-qr:not([hidden]) { display: block; margin-top: .75rem; }
+.user-actions[hidden] { display: none; }
 .entry input { min-width: 0; min-height: 52px; padding: 8px 14px; border: 1px solid #8e9d94; border-radius: 7px; font: inherit; }
 .entry .primary { justify-self: start; margin-top: 8px; }
+.entry [hidden] { display: none !important; }
+.entry #mr-feedback:not(:empty) { margin-block: 1rem; }
 .switch-user { display: inline-flex; align-items: center; gap: .4em; min-height: 44px; color: #34594d; text-underline-offset: 4px; }
 main {
   width: min(100%, 1280px);

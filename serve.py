@@ -7,6 +7,7 @@ import sqlite3
 import subprocess
 import tempfile
 from contextlib import closing, nullcontext
+from datetime import datetime, timezone
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PureWindowsPath
@@ -15,18 +16,27 @@ from urllib.parse import parse_qs, unquote, urlsplit
 from uuid import UUID, uuid4
 
 import production as prod
+from server.capture_guide import capture_guide
+from server.gemini_live import issue_token
+from server.device_pairing import DevicePairing
+from server.alignment_store import latest_record, save_record, save_photo
 
 ROOT = Path(__file__).resolve().parent
 WEB = ROOT / "web"
 MAX_PDF = 128 * 1024 * 1024
+MAX_VIDEO = 64 * 1024 * 1024
 USER_ID = r"[A-Z0-9][A-Z0-9_-]{0,31}"
 LIBRARY_PATH = re.compile(rf"/users/({USER_ID})/")
 MANUAL_PATH = re.compile(rf"/api/users/({USER_ID})/manuals(?:/(pdf-[0-9a-f]{{32}})/(pdf|cover))?")
 USER_PATH = re.compile(rf"/api/users/({USER_ID})")
-WORK_PATH = re.compile(rf"/api/users/({USER_ID})/manuals/(pdf-[0-9a-f]{{32}})/workflow(?:/(S1/task_step\.json|S1/figure/p[0-9]{{3,}}-[0-9]{{2,}}\.png|S2/bindings\.json|S2/model\.glb))?")
+CAPTURE_PATH = re.compile(rf"/api/users/({USER_ID})/manuals/(pdf-[0-9a-f]{{32}})/captures(?:/([0-9a-f]{{32}}))?")
+S4_ASSET = r"S4/(?:alignment\.json|alignment-(?:record|latest)\.json|alignment-records/[a-f0-9-]{36}\.json|alignment-photos/[a-f0-9]{64}\.jpg|[a-f0-9]{16}/revisions/[a-f0-9]{16}/S2/(?:bindings\.json|model\.glb))"
+WORK_PATH = re.compile(rf"/api/users/({USER_ID})/manuals/(pdf-[0-9a-f]{{32}})/workflow(?:/(S1/task_step\.json|S1/figure/p[0-9]{{3,}}-[0-9]{{2,}}\.png|S2/bindings\.json|S2/model\.glb|S3/guide\.json|{S4_ASSET}))?")
 library_lock = Lock()
 active = set()
 generation_slot = Semaphore(1)
+demo_upload_slots = Semaphore(3)
+DEMO_STORAGE_LIMIT = 2 * 1024**3
 
 
 def user_id(value):
@@ -163,7 +173,9 @@ class Library(SimpleHTTPRequestHandler):
         return True
 
     def end_headers(self):
+        self.send_header("X-Frame-Options", "SAMEORIGIN")
         self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Host-Management-Version", "11")
         if getattr(self, "path", "").partition("?")[0] in {
             "/support.html", "/support.css", "/support.js", "/viewer.js", "/quest-controls.svg", "/quest-lock.png"
         }:
@@ -210,6 +222,9 @@ class Library(SimpleHTTPRequestHandler):
             return self.send_error(404)
         if not path.startswith("/api/"):
             return super().do_GET()
+        capture = CAPTURE_PATH.fullmatch(path)
+        if capture and user_id(capture[1]):
+            return self.captures(capture, False)
         workflow = WORK_PATH.fullmatch(path)
         if workflow and user_id(workflow[1]):
             return self.workflow(workflow, False)
@@ -226,6 +241,9 @@ class Library(SimpleHTTPRequestHandler):
                     generation = db.execute("SELECT generation FROM identity").fetchone()[0]
                 else:
                     column = match[3]
+                    scope = self.headers.get("X-Venue-Generation")
+                    if scope is not None and (match[1] != "DEMO" or not still_current(db, scope, match[2], "ready")):
+                        return self.send_error(403)
                     row = db.execute(f"SELECT {column} FROM manuals WHERE id=?", (match[2],)).fetchone()
         except FileNotFoundError:
             return self.send_error(404)
@@ -236,8 +254,89 @@ class Library(SimpleHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
+        if self.path == "/api/capture-live-token":
+            if self.headers.get("Origin") != f"http://{self.headers['Host']}" or self.headers.get("X-Venue-Guest"):
+                return self.send_error(403)
+            context = None
+            try:
+                size=int(self.headers.get("Content-Length", "0"))
+                if not 0 <= size <= 24000: raise ValueError
+                if size:
+                    context=json.loads(self.rfile.read(size))["questionContext"]
+                    if not isinstance(context,str) or not 0<len(context)<=6000: raise ValueError
+            except (ValueError,TypeError,KeyError,UnicodeError):
+                return self.send_error(400)
+            try:
+                return self.json_response(200, issue_token(context) if context is not None else issue_token())
+            except (OSError, ValueError, KeyError):
+                return self.json_response(503, {"error": "Gemini音声に接続できません。配信PCのキーと通信を確認してください。"})
+        device = re.fullmatch(r"/api/devices/([1-9][0-9]{0,14})/(rename|revoke|approve|deny)", self.path)
+        if self.path in ("/api/devices", "/api/devices/pending") or device:
+            if not self.local_management_request():
+                return self.send_error(403)
+            store = DevicePairing(self.server.database.parent / "quest-wifi" / "pairing.sqlite3")
+            if not device:
+                return self.json_response(200, store.browsers(pending=self.path.endswith("/pending")))
+            identifier = int(device[1])
+            if device[2] == "rename":
+                try:
+                    size = int(self.headers.get("Content-Length", "0"))
+                    if self.headers.get_content_type() != "application/json" or not 0 < size <= 1024:
+                        raise ValueError
+                    data = json.loads(self.rfile.read(size))
+                    name = data.get("name") if isinstance(data, dict) else None
+                    if not isinstance(name, str) or len(name.strip()) > 64 or not name.isprintable() and name:
+                        raise ValueError
+                except (ValueError, UnicodeError):
+                    return self.send_error(400)
+                found = store.rename(identifier, name.strip())
+            elif device[2] in ("approve", "deny"):
+                found = store.review_personal(identifier, device[2] == "approve")
+            else:
+                found = store.revoke(identifier)
+            return self.json_response(200, {}) if found else self.send_error(404)
+        venue = self.path == "/api/venue/qr"
+        if venue or self.path in {"/api/device-qr", "/api/venue/status", "/api/venue/end"}:
+            if not self.local_management_request():
+                return self.send_error(403)
+            store = DevicePairing(self.server.database.parent / "quest-wifi" / "pairing.sqlite3")
+            if venue or self.path == "/api/device-qr":
+                origin = store.entry(self.server.server_port)
+                if not origin:
+                    return self.json_response(503, {"error": "Wi-Fi配信を起動してください。"})
+                if not venue:
+                    personal = store.invite_device()
+                    return self.json_response(200, {"url": origin + "/join/device#" + personal["invite"],
+                                                    "expires": personal["expires"]})
+                try:
+                    with library_lock, closing(open_library(library_path(self.server.database, "DEMO"))) as db:
+                        rows = db.execute("""SELECT id, name, model FROM manuals JOIN production USING(id)
+                            WHERE stage='ready' ORDER BY manuals.rowid DESC""").fetchall()
+                        if not rows:
+                            return self.send_error(404)
+                        generation = db.execute("SELECT generation FROM identity").fetchone()[0]
+                        catalog = [dict(id=i, name=n, model=m, stage="ready") for i, n, m in rows]
+                        result = store.venue_code(catalog, generation)
+                        if result:
+                            result["url"] = origin + "/join#" + result.pop("code")
+                except FileNotFoundError:
+                    return self.send_error(404)
+                return self.json_response(200, result) if result else self.send_error(409)
+            if self.path.endswith("/end"):
+                store.end_venue()
+            return self.json_response(200, store.venue_status())
+        capture = CAPTURE_PATH.fullmatch(self.path)
+        if capture and capture[3] and user_id(capture[1]):
+            if self.headers.get("X-Venue-Guest"):
+                if not demo_upload_slots.acquire(blocking=False):
+                    return self.send_error(429)
+                try:
+                    return self.captures(capture, True)
+                finally:
+                    demo_upload_slots.release()
+            return self.captures(capture, True)
         workflow = WORK_PATH.fullmatch(self.path)
-        if workflow and not workflow[3] and user_id(workflow[1]):
+        if workflow and (workflow[3] in (None, "S4/alignment-record.json") or workflow[3].startswith("S4/alignment-photos/")) and user_id(workflow[1]):
             return self.workflow(workflow, True)
         match = MANUAL_PATH.fullmatch(self.path)
         if not match or match[2] or not user_id(match[1]):
@@ -290,18 +389,132 @@ class Library(SimpleHTTPRequestHandler):
             return self.json_response(503, {"error": "保存できませんでした。もう一度追加してください。"})
         self.json_response(201, {"id": identifier})
 
+    def captures(self, match, post):
+        participant, identifier, take = match.groups()
+        path = library_path(self.server.database, participant)
+        guest = self.headers.get("X-Venue-Guest")
+        if guest is not None and (participant != "DEMO" or not re.fullmatch("[0-9a-f]{64}", guest)):
+            return self.send_error(403)
+        if post and self.headers.get("Origin") != f"http://{self.headers['Host']}":
+            return self.send_error(403)
+        try:
+            with library_lock, closing(open_library(path)) as db:
+                row = db.execute("""SELECT generation, model FROM identity, manuals JOIN production USING(id)
+                                     WHERE id=? AND stage='ready'""", (identifier,)).fetchone()
+                if not row:
+                    return self.send_error(404)
+                token, model = row
+                if guest and self.headers.get("X-Venue-Generation") != token:
+                    return self.send_error(403)
+                root = prod.stage_root(path, token, identifier, model)
+                folder = root / "S3" / "captures"
+                if not post:
+                    if not take:
+                        entries = [prod.read_json(f) for f in folder.glob("*/capture.json")]
+                        if guest:
+                            entries = [item for item in entries if item.get("guest") == guest]
+                        return self.json_response(200, sorted(entries, key=lambda c: c["time"], reverse=True))
+                    meta = prod.read_json(folder / take / "capture.json")
+                    if guest and meta.get("guest") != guest:
+                        return self.send_error(404)
+                    video = (folder / take / meta["file"]).open("rb")
+                else:
+                    if self.headers.get("X-Library-Generation") != token:
+                        return self.send_error(409)
+                    bindings = prod.read_json(root / "S2" / "bindings.json")
+                    notes = bindings["notes"]
+                    request_id = self.headers.get("X-Capture-Request")
+                    guide = None
+                    if request_id is not None:
+                        guide = next((item for item in capture_guide(root, bindings) if item["key"] == request_id), None)
+                        if guide is None:
+                            return self.send_error(400)
+            if not post:
+                with video:
+                    self.send_response(200)
+                    self.send_header("Content-Type", meta["mime"])
+                    self.send_header("Content-Length", str(meta["bytes"]))
+                    self.send_header("Cache-Control", "no-store")
+                    self.end_headers()
+                    shutil.copyfileobj(video, self.wfile)
+                return
+            size = int(self.headers.get("Content-Length", "0"))
+            if not 0 < size <= MAX_VIDEO:
+                return self.send_error(413)
+            mime = self.headers.get_content_type()
+            if mime not in ("video/webm", "video/mp4", "image/jpeg"):
+                return self.send_error(415)
+            note = self.headers.get("X-Capture-Note", "")
+            if note != "overview" and not (re.fullmatch(r"[0-9]{1,8}", note) and int(note) < len(notes)):
+                return self.send_error(400)
+            if guide and note != ("overview" if guide["noteIndex"] is None else str(guide["noteIndex"])):
+                return self.send_error(400)
+            filename = "photo.jpg" if mime == "image/jpeg" else "video." + mime.split("/")[1]
+            # Stage on the same volume, outside the participant tree while receiving.
+            with tempfile.TemporaryDirectory(dir=self.server.database.parent) as temp:
+                staged = Path(temp) / take
+                staged.mkdir()
+                with (staged / filename).open("wb") as out:
+                    remaining = size
+                    while remaining:
+                        block = self.rfile.read(min(remaining, 256 * 1024))
+                        if not block:
+                            return self.send_error(400)
+                        out.write(block)
+                        remaining -= len(block)
+                with (staged / filename).open("rb") as source:
+                    header = source.read(12)
+                valid = {"image/jpeg": header.startswith(b"\xff\xd8\xff"), "video/mp4": header[4:8] == b"ftyp",
+                         "video/webm": header.startswith(bytes.fromhex("1a45dfa3"))}
+                if not valid[mime]:
+                    return self.send_error(422)
+                meta = dict(id=take, time=datetime.now(timezone.utc).isoformat(), file=filename, mime=mime,
+                            bytes=size, note=None if note == "overview" else notes[int(note)])
+                if guest:
+                    meta["guest"] = guest
+                if guide:
+                    meta["guide"] = {k: guide[k] for k in ("key", "task", "step", "part", "name", "pages", "request", "mode")}
+                (staged / "capture.json").write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+                with library_lock, closing(open_library(path)) as db:
+                    if not still_current(db, token, identifier, "ready"):
+                        return self.send_error(409)
+                    if guest:
+                        store = DevicePairing(self.server.database.parent / "quest-wifi" / "pairing.sqlite3")
+                        if not store.guest_active(guest, token):
+                            return self.send_error(403)
+                    folder.mkdir(parents=True, exist_ok=True)
+                    if (folder / take).exists():
+                        existing = prod.read_json(folder / take / "capture.json")
+                        if guest and existing.get("guest") != guest:
+                            return self.send_error(409)
+                        return self.json_response(200, existing)
+                    if guest:
+                        captures = root.parent.glob("*/S3/captures/*/*")
+                        if size + sum(f.stat().st_size for f in captures if f.name != "capture.json") > DEMO_STORAGE_LIMIT:
+                            return self.send_error(507)
+                    staged.rename(folder / take)
+            return self.json_response(201, meta)
+        except FileNotFoundError:
+            return self.send_error(404)
+        except ValueError:
+            return self.send_error(400)
+        except (sqlite3.Error, OSError):
+            return self.send_error(503)
+
     def workflow(self, match, post):
         participant, identifier, asset = match.groups()
+        photo = (asset or "").startswith("S4/alignment-photos/")
         path = library_path(self.server.database, participant)
         if post:
             if self.headers.get("Origin") != f"http://{self.headers['Host']}":
                 return self.send_error(403)
             try:
                 size = int(self.headers.get("Content-Length", "0"))
-                if not 0 < size <= 2048:
+                if not 0 < size <= (4*1024**2 if photo else 512 * 1024 if asset == "S4/alignment-record.json" else 2048):
                     raise ValueError
-                action = json.loads(self.rfile.read(size))
-                if not isinstance(action, dict):
+                body = self.rfile.read(size)
+                action = None if photo else json.loads(body)
+                if not photo and not isinstance(action, dict):
                     raise ValueError
             except (ValueError, UnicodeError):
                 return self.send_error(400)
@@ -312,13 +525,43 @@ class Library(SimpleHTTPRequestHandler):
                 if not row:
                     return self.send_error(404)
                 name, model, stage, encoded, error, token = row
+                guest = self.headers.get("X-Venue-Generation")
+                if guest is not None and (participant != "DEMO" or post or stage != "ready" or guest != token):
+                    return self.send_error(403)
+                if guest is not None and not asset:
+                    return self.json_response(200, dict(name=name, model=model, stage=stage))
                 choices = json.loads(encoded or "[]")
                 if asset:
+                    if guest is not None and asset.startswith("S4/"):
+                        return self.send_error(403)
                     available = stage == "ready" or (stage == "s2" and asset.startswith("S1/"))
                     if not available:
                         return self.send_error(404)
-                    body = (prod.stage_root(path, token, identifier, model) / asset).read_bytes()
-                    mime = {".png": "image/png", ".json": "application/json", ".glb": "model/gltf-binary"}
+                    root = prod.stage_root(path, token, identifier, model)
+                    if photo and post:
+                        if self.headers.get("X-Library-Generation") != token:
+                            return self.send_error(409)
+                        try:
+                            save_photo(root, Path(asset).name, body)
+                        except ValueError:
+                            return self.send_error(400)
+                        return self.json_response(200, {"saved":True})
+                    if asset == "S4/alignment-record.json":
+                        if not post or self.headers.get("X-Library-Generation") != token:
+                            return self.send_error(409 if post else 405)
+                        try:
+                            save_record(root, action)
+                        except (ValueError, TypeError):
+                            return self.send_error(400)
+                        return self.json_response(200, {"saved": True})
+                    if post:
+                        return self.send_error(405)
+                    if asset == "S4/alignment-latest.json":
+                        return self.json_response(200, latest_record(root), token)
+                    if asset == "S3/guide.json":
+                        return self.json_response(200, capture_guide(root), token)
+                    body = (root / asset).read_bytes()
+                    mime = {".png": "image/png", ".jpg":"image/jpeg", ".json": "application/json", ".glb": "model/gltf-binary"}
                     return self.payload(200, mime[Path(asset).suffix], body)
                 if post:
                     if self.headers.get("X-Library-Generation") != token:
@@ -348,17 +591,23 @@ class Library(SimpleHTTPRequestHandler):
                         return self.json_response(409, {"error": "状態が変わりました。再読み込みしてください。"})
                 if stage in prod.STAGES and not error:
                     schedule(path, token, identifier)
-            return self.json_response(200, dict(name=name, model=model, stage=stage, models=choices, error=error), token)
+                alignment = stage == "ready" and (prod.stage_root(path, token, identifier, model) / "S4/alignment.json").is_file()
+            return self.json_response(200, dict(name=name, model=model, stage=stage, models=choices, error=error, alignment=alignment), token)
         except FileNotFoundError:
             return self.send_error(404)
         except (sqlite3.Error, OSError):
             return self.json_response(503, {"error": "生成状態を取得できませんでした。"})
 
+    def local_management_request(self):
+        return (self.client_address[0] == "127.0.0.1"
+                and self.headers.get("Origin") == f"http://{self.headers['Host']}"
+                and self.headers.get("X-Host-Management") == "1")
+
     def do_DELETE(self):
         match = USER_PATH.fullmatch(self.path)
         if not match or not user_id(match[1]):
             return self.send_error(404)
-        if self.headers.get("Origin") != f"http://{self.headers['Host']}":
+        if not self.local_management_request():
             return self.send_error(403)
         path = library_path(self.server.database, match[1])
         try:

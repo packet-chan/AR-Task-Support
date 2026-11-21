@@ -1,0 +1,282 @@
+{
+  "Measure the cabinet width, depth and scanner height before aligning the model.": {
+    "mode": "photo",
+    "focus": "外装の幅と奥行き、スキャナーの高さが分かる角度"
+  },
+  "Check which drawer the display identifies. Tray 1 represents the standard drawer motion.": {
+    "mode": "photo",
+    "focus": "画面のトレイ番号と、対応する引き出しの位置"
+  },
+  "Identify the installed lower drawer module. The tandem module and envelope tray are shown separately.": {
+    "mode": "photo",
+    "focus": "下段に装着されている給紙ユニットの形と位置"
+  },
+  "Check the lower hinge line and the angle at which the door supports stop.": {
+    "mode": "video",
+    "focus": "正面カバーの下側の支点と、開いて止まる位置"
+  },
+  "Match the indicated colour to its bay before checking cartridge travel.": {
+    "mode": "video",
+    "focus": "対象の色表示と、カートリッジが動く範囲"
+  },
+  "Check the filter end and handle against the 65–70 machine illustration.": {
+    "mode": "photo",
+    "focus": "トナー回収ボトルのフィルター側の端と取っ手"
+  },
+  "Read the feeder model plate and check the cover sequence for B1-PC or C2-PC.": {
+    "mode": "photo",
+    "focus": "原稿送り装置の型番表示とカバーの配置"
+  },
+  "Check for a side tray or high-capacity feeder before checking left-cover clearance.": {
+    "mode": "photo",
+    "focus": "左カバー付近にあるトレイや給紙装置とその間隔"
+  },
+  "Confirm which LAN, USB and wireless options are fitted behind the rear cover.": {
+    "mode": "photo",
+    "focus": "背面に見える端子とオプションの配置"
+  },
+  "Check the fitted IC reader, USB slot and fax button layout.": {
+    "mode": "photo",
+    "focus": "操作パネルのボタン、ICリーダーやUSB端子の配置"
+  },
+  "Check the latch position and how far the reverse-side reader opens.": {
+    "mode": "video",
+    "focus": "裏面読み取り部のラッチと開く範囲"
+  },
+  "Measure the extension travel and guide spacing with the tray open.": {
+    "mode": "video",
+    "focus": "トレイの伸長部の動きとガイドの間隔"
+  },
+  "Check the rear pivot, full-open stop and extraction direction at 45 degrees.": {
+    "mode": "video",
+    "focus": "上ぶたが開くときの後ろの支点と止まる位置"
+  },
+  "Confirm the marked pouring side relative to the hinge and controls.": {
+    "mode": "photo",
+    "focus": "湯捨て位置の表示と、つまみ・操作部との位置関係"
+  },
+  "Check the filter shape, seating depth and pull direction.": {
+    "mode": "video",
+    "focus": "容器ネットが取り付く位置と抜き差しの方向"
+  },
+  "Check the gasket lip orientation and pin-to-hole alignment before tightening the four screws.": {
+    "mode": "photo",
+    "focus": "内ぶたパッキンの縁の向きとピン・穴の位置"
+  },
+  "Verify the magnetic connector orientation and cord clearance at the rotating base.": {
+    "mode": "photo",
+    "focus": "マグネットプラグの向きと底部のコード周り"
+  },
+  "Check key spacing, the tactile dot and lamp positions on the physical panel.": {
+    "mode": "photo",
+    "focus": "操作パネルのキー、凸点、ランプの配置"
+  },
+  "Measure housing width, depth and height to verify diagram-derived proportions.": {
+    "mode": "photo",
+    "focus": "本体の幅・奥行き・高さが分かる角度"
+  },
+  "Check the right-hand hinge axis and opening clearance.": {
+    "mode": "video",
+    "focus": "サービスドアの支点と開くときの周囲のすき間"
+  },
+  "Check both top cover stops and the clearance for lifting the inner covers.": {
+    "mode": "video",
+    "focus": "上ぶたの止まる位置と内ぶたを持ち上げる空間"
+  },
+  "Check the base hook enters hole (E) before the carafe seats against the connector.": {
+    "mode": "video",
+    "focus": "ミルク容器の底のフックと穴E、接続部までの動き"
+  },
+  "Check the dispensing and rinse stops and which section of the handle turns.": {
+    "mode": "video",
+    "focus": "ミルク容器の取っ手で回る部分と止まる位置"
+  },
+  "Measure vertical travel and confirm the removal direction.": {
+    "mode": "video",
+    "focus": "抽出口と本体が一緒に映り、上下の動きが分かる角度"
+  },
+  "Check how the grounds drawer seats in the internal tray and how far the tray slides.": {
+    "mode": "video",
+    "focus": "かす受けの収まりと内部トレイを引き出す範囲"
+  },
+  "Confirm the soft key beside each on-screen command on the HD8943.": {
+    "mode": "photo",
+    "focus": "画面に表示された項目と横に並ぶ選択キー"
+  },
+  "Check the rear rocker orientation and the socket position.": {
+    "mode": "photo",
+    "focus": "背面スイッチの向きと電源差込口の位置"
+  },
+  "Measure tray width and depth to establish model scale.": {
+    "mode": "photo",
+    "focus": "水受けトレイの幅と奥行きが分かる角度"
+  },
+  "Confirm the lower-left function button selects STEAM as pictured. The step text names the special beverage button.": {
+    "mode": "photo",
+    "focus": "蒸気の画面表示とその左下の選択ボタン"
+  },
+  "Read the error code and verify the 30-second pause between switching off and on.": {
+    "mode": "photo",
+    "focus": "エラー発生時に実際に表示されているコードと表示位置"
+  },
+  "Measure case width, depth and height against the model.": {
+    "mode": "photo",
+    "focus": "外装の幅・奥行き・高さが分かる角度"
+  },
+  "Check the left hinge axis, open angle and handle clearance.": {
+    "mode": "video",
+    "focus": "ドア左側の支点、開く範囲、取っ手周辺のすき間"
+  },
+  "Check how far the center hub lifts before it clears the shaft.": {
+    "mode": "video",
+    "focus": "中央のハブが軸から離れるまでの動き"
+  },
+  "Check the rim diameter and whether the plate sits level on the support.": {
+    "mode": "photo",
+    "focus": "丸皿の縁と支持部への載り方"
+  },
+  "Compare key spacing and the display position with the front panel.": {
+    "mode": "photo",
+    "focus": "前面パネルのキー間隔と表示部の位置"
+  },
+  "Confirm the lamp position relative to the right-wall cover.": {
+    "mode": "photo",
+    "focus": "庫内灯と右壁のカバーの位置関係"
+  },
+  "Check the heater shape and clearance above the support.": {
+    "mode": "photo",
+    "focus": "ヒーターの形と支持部までの間隔"
+  },
+  "Check the cord exit and plug shape at the rear.": {
+    "mode": "photo",
+    "focus": "背面のコード出口とプラグの形"
+  },
+  "Confirm which optional grounding accessory is present at the installation.": {
+    "mode": "photo",
+    "focus": "設置場所のアース接続部と実際に付いている付属品"
+  },
+  "Measure the chassis depth at the rear enclosure and confirm the front bezel widths.": {
+    "mode": "photo",
+    "focus": "本体背面の厚みと前面の額縁の幅"
+  },
+  "Check both handle openings and the shaded carrying areas on page 3.": {
+    "mode": "photo",
+    "focus": "図と照合できるように左右の取っ手と持ち手の開口部"
+  },
+  "Measure the four mounting-hole centers and confirm thread depth before fitting hardware.": {
+    "mode": "photo",
+    "focus": "背面の取付穴4か所の配置"
+  },
+  "Trace HDMI1 and HDMI2 to TOUCH PANEL1. Check the side-facing socket order.": {
+    "mode": "photo",
+    "focus": "HDMI1・HDMI2とTOUCH PANEL1の端子名・並び"
+  },
+  "Trace HDMI3 and D-sub to TOUCH PANEL2.": {
+    "mode": "photo",
+    "focus": "HDMI3・D-subとTOUCH PANEL2の位置"
+  },
+  "Read the cord rating and confirm the connector keying at the inlet.": {
+    "mode": "photo",
+    "focus": "電源コードの定格表示と差込口の形"
+  },
+  "Check the lift angle and where the retaining tabs disengage.": {
+    "mode": "video",
+    "focus": "リモコンの電池ぶたの持ち上がる角度と爪が外れる位置"
+  },
+  "Match each AAA cell to the polarity marks inside the remote.": {
+    "mode": "photo",
+    "focus": "単4電池の向きとリモコン内の極性表示"
+  },
+  "Confirm the marked face points forward and the adapter seats flush.": {
+    "mode": "photo",
+    "focus": "アダプターの表示面と取り付けたときの収まり"
+  },
+  "Check the rocker axis and the I/O markings from below.": {
+    "mode": "photo",
+    "focus": "下側から見た電源スイッチの向きとI/O表示"
+  },
+  "Check the flange orientation and spacing of the two M3 x 6 fasteners.": {
+    "mode": "photo",
+    "focus": "取付金具の向きと2本の固定ねじの間隔"
+  },
+  "Confirm the logo position and seal coverage on the lower bezel.": {
+    "mode": "photo",
+    "focus": "下側の額縁のロゴ位置とシールの範囲"
+  },
+  "Check button travel and the lamp location on the lower-right bezel.": {
+    "mode": "video",
+    "focus": "右下の電源ボタンの動きとランプの位置"
+  },
+  "Check hinge travel and clearance before raising the output guide.": {
+    "mode": "video",
+    "focus": "トップカバーの支点と排紙ガイド周りのすき間"
+  },
+  "Check that the stopper is on the left and both shaft ends seat in the grooves.": {
+    "mode": "photo",
+    "focus": "ストッパーの位置と左右の軸端のガイド溝への収まり"
+  },
+  "Check the status lamp and confirm the printer is idle.": {
+    "mode": "photo",
+    "focus": "現在の状態が読み取れるようにステータスランプとその周囲"
+  },
+  "Check that the button stays depressed for at least one second.": {
+    "mode": "video",
+    "focus": "電源ボタンを押している間の指先とボタン"
+  },
+  "Check that the right paper edge stays parallel to the line.": {
+    "mode": "photo",
+    "focus": "用紙右端と右側の紙合わせライン"
+  },
+  "Check the far paper edge against the near side of the rear marks.": {
+    "mode": "photo",
+    "focus": "用紙の奥の端と奥側の紙合わせライン"
+  },
+  "Check all three angle detents on both arms.": {
+    "mode": "photo",
+    "focus": "左右のバスケットアームの角度と固定位置"
+  },
+  "Locate both pairs of hooks and confirm that both rod ends seat.": {
+    "mode": "photo",
+    "focus": "2組の取り付け箇所とロッドの両端"
+  },
+  "Compare cloth sag with the roll unit removed.": {
+    "mode": "photo",
+    "focus": "ロールユニット未使用時のバスケット布のたわみ"
+  },
+  "Check clearance below the upper hooks with both arms fully extended.": {
+    "mode": "photo",
+    "focus": "上側の取り付け箇所と伸ばしたアーム下のすき間"
+  },
+  "Check fabric tension with the arms lowered for long prints.": {
+    "mode": "photo",
+    "focus": "長尺印刷時のアームの角度と布の張り"
+  },
+  "Check that the lower hook pair gives a taut stacking surface.": {
+    "mode": "photo",
+    "focus": "下側の取り付け箇所と積載面の張り"
+  },
+  "Check tension at the upper hooks with the arms extended.": {
+    "mode": "photo",
+    "focus": "上側の取り付け箇所と伸ばしたアーム、布の張り"
+  },
+  "Check that both arms retract fully in the horizontal position.": {
+    "mode": "video",
+    "focus": "水平にした左右のアームが収納される範囲"
+  },
+  "Check shaft seating and clearance below the printer before locking.": {
+    "mode": "photo",
+    "focus": "固定前の軸と溝の位置、プリンター下のすき間"
+  },
+  "Match the switch position to the intended winding direction.": {
+    "mode": "photo",
+    "focus": "巻き取り方向の切り替えスイッチと表示"
+  },
+  "Check that the paper edge runs square to the core before taping.": {
+    "mode": "photo",
+    "focus": "テープ留め前の用紙の端と紙管の位置関係"
+  },
+  "Check which button winds the paper for the selected direction.": {
+    "mode": "photo",
+    "focus": "巻き取りに使うボタンと方向の表示"
+  }
+}

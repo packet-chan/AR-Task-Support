@@ -1,0 +1,154 @@
+{
+  "model": "HD8943",
+  "reference": "機器を動かさず、扉とふたが閉じた状態で始めます。点が隠れていれば保留してください。指示は位置の記録用です。ボタン操作やコードの抜き差しは不要です。",
+  "groups": [
+    {
+      "id": "body",
+      "quickFit": [0, 2, 3],
+      "label": "本体",
+      "diagram": {"file":"p002-01.png","points":[[0.358,0.185],[0.643,0.185],[0.62,0.12],null,null]},
+      "surfaces": ["RearHousing", "Floor", "Side0", "Side2", "Roof", "Fascia"],
+      "fitLimit": 0.025,
+      "checkLimit": 0.025,
+      "fit": [
+        [
+          "Roof",
+          [0, 1, 1],
+          "正面から見て、天板の手前左角"
+        ],
+        [
+          "Roof",
+          [1, 1, 1],
+          "天板の手前右角"
+        ],
+        [
+          "Roof",
+          [1, 1, 0],
+          "天板の奥右角"
+        ],
+        [
+          "Floor",
+          [0, 0, 1],
+          "本体底部の手前左角"
+        ]
+      ],
+      "check": [
+        [
+          "Floor",
+          [1, 0, 1],
+          "本体底部の手前右角"
+        ]
+      ]
+    },
+    {
+      "id": "panel",
+      "label": "操作パネル",
+      "diagram": {"file":"p004-01.png","points":[[0.057,0.247],[0.941,0.247],[0.941,0.651],[0.057,0.651],[0.498,0.446]]},
+      "surfaces": ["Panel", "Display"],
+      "node": "Panel",
+      "fitLimit": 0.01,
+      "checkLimit": 0.005,
+      "fit": [
+        [
+          "Panel",
+          [0, 1, 1],
+          "正面から見て、操作パネル外枠の左上角"
+        ],
+        [
+          "Panel",
+          [1, 1, 1],
+          "操作パネル外枠の右上角"
+        ],
+        [
+          "Panel",
+          [1, 0, 1],
+          "操作パネル外枠の右下角"
+        ],
+        [
+          "Panel",
+          [0, 0, 1],
+          "操作パネル外枠の左下角"
+        ]
+      ],
+      "check": [
+        [
+          "Display",
+          [0.5, 0.5, 1],
+          "表示画面の中心"
+        ]
+      ]
+    }
+  ],
+  "partLimit": 0.012,
+  "accessoryRoots": ["Carafe","Cord","Scoop","Tester","Lubricant","Descaler","Tablets","Filter","Brush","Cup"],
+  "movable": ["Door","Tank","TankInner","TankLid","HopperLid","HopperInner","Spout","Wand","Tray","Float","Hole","Carafe","Lid","Arm","Latch0","Recovery","Grounds","Brew","Cord","Scoop","Tester","Lubricant","Descaler","Tablets","Filter","Brush","Cup","LidHandle"],
+  "targets": {
+    "Door": ["Fascia", "サービス扉の正面中央", [0.5,0.5,1]],
+    "Panel": ["Panel", "操作パネルの中心", [0.5,0.5,1]],
+    "Display": ["Display", "表示画面の中心", [0.5,0.5,1]],
+    "Espresso": ["Espresso", "エスプレッソボタンの中央", [0.5,0.5,1]],
+    "Long": ["Long", "ロングエスプレッソボタンの中央", [0.5,0.5,1]],
+    "Special": ["Special", "スペシャルボタンの中央", [0.5,0.5,1]],
+    "Dose": ["Dose", "豆量調整ボタンの中央", [0.5,0.5,1]],
+    "Hot": ["Hot", "給湯ボタンの中央", [0.5,0.5,1]],
+    "Clean": ["Clean", "洗浄ボタンの中央", [0.5,0.5,1]],
+    "Standby": ["Standby", "スタンバイボタンの中央", [0.5,0.5,1]],
+    "Cappuccino": ["Cappuccino", "カプチーノボタンの中央", [0.5,0.5,1]],
+    "Latte": ["Latte", "ラテマキアートボタンの中央", [0.5,0.5,1]],
+    "Cafe": ["Cafe", "カフェラテボタンの中央", [0.5,0.5,1]],
+    "KeyUL": ["KeyUL", "画面左上の機能ボタンの中央", [0.5,0.5,1]],
+    "KeyUR": ["KeyUR", "画面右上の機能ボタンの中央", [0.5,0.5,1]],
+    "KeyLL": ["KeyLL", "画面左下の機能ボタンの中央", [0.5,0.5,1]],
+    "KeyLR": ["KeyLR", "画面右下の機能ボタンの中央", [0.5,0.5,1]],
+    "Tank": ["TankSide0", "水タンクの左側面中央", [0,0.5,0.5]],
+    "TankInner": ["TankGrip", "水タンク内ぶたの取っ手中央"],
+    "TankLid": ["TankLeaf", "水タンク外ぶたの上面中央", [0.5,1,0.5]],
+    "Hopper": ["HopperSide0", "豆ホッパーの左側面中央", [0,0.5,0.5]],
+    "HopperInner": ["HopperGrip", "豆ホッパー内ぶたの取っ手中央"],
+    "HopperLid": ["HopperLeaf", "豆ホッパー外ぶたの上面中央", [0.5,1,0.5]],
+    "Warmer": ["Warmer", "カップウォーマーの上面中央", [0.5,1,0.5]],
+    "Doser": ["Doser", "粉投入口の中央", [0.5,1,0.5]],
+    "Grinder": ["Grinder", "挽き目調整部の中央"],
+    "Spout": ["Spout", "抽出口本体の正面中央", [0.5,0.5,1]],
+    "Dial": ["Dial", "SBSダイヤルの中央"],
+    "Wand": ["WandTube", "給湯・スチーム管の中央"],
+    "Connector": ["Connector", "ミルクカラフェ接続部の中央"],
+    "Tray": ["Grill", "水受けグリルの上面中央", [0.5,1,0.5]],
+    "Float": ["Float", "水位表示の中央"],
+    "Hole": ["Hole", "カラフェ用の穴の中央"],
+    "Carafe": ["Vessel", "カラフェ容器の正面中央", [0.5,0.5,1]],
+    "Lid": ["Lid", "カラフェのふた中央", [0.5,1,0.5]],
+    "Arm": ["ArmBar", "カラフェ上部の可動アームの中央"],
+    "Latch0": ["Latch0", "モデルの印と同じ側のふた解除ボタン中央"],
+    "Release": ["Release", "サービス扉を開くボタンの中央"],
+    "Recovery": ["Recovery", "液体回収トレイの正面中央", [0.5,0.5,1]],
+    "Grounds": ["BinSide0", "かす受け容器の左側面中央", [0,0.5,0.5]],
+    "Brew": ["BrewGrip", "抽出ユニットの取っ手中央"],
+    "Power": [
+      "Power",
+      "背面の電源スイッチ中央",
+      [0.5, 0.5, 0]
+    ],
+    "Socket": [
+      "Socket",
+      "背面にある機器側の電源コード差込口の中心（外側から）",
+      [0.5, 0.5, 0]
+    ],
+    "Cord": ["Plug", "コードの機器側プラグの中央"],
+    "Scoop": ["ScoopFloor", "計量スプーンのさじ中央"],
+    "Tester": ["Strip", "水硬度試験紙の中央"],
+    "Lubricant": ["Tube", "潤滑剤のチューブ中央"],
+    "Descaler": ["Bottle", "除石灰剤のボトル中央"],
+    "Tablets": ["Blister", "洗浄剤の包装中央"],
+    "Filter": ["FilterBody", "浄水フィルターの本体中央"],
+    "Brush": ["BrushStem", "ブラシの柄の中央"],
+    "Cup": ["CupBody", "カップの正面中央", [0.5,0.5,1]],
+    "LidHandle": ["LockLever", "カラフェのふたのハンドル中央"]
+  },
+  "stepTargets": {
+    "task-1-step-4": "Socket"
+  },
+  "stepHints": {
+    "task-1-step-4": "印は機器側の差込口を示します。壁側のコンセントは含みません。"
+  }
+}

@@ -23,6 +23,16 @@
         <button data-ui>この型番で作成</button>
       </form>
       <button id="action" hidden></button>
+      <button id="enter-assist" hidden>位置合わせ・AR支援</button>
+      <span id="assist-status" role="status"></span>
+      <details id="alignment-record" hidden><summary>直近の位置合わせ記録</summary><p></p><ul></ul></details>
+      <div id="capture-tools" hidden>
+        <label id="capture-voice-option" hidden><input type="checkbox" id="capture-live" checked> Gemini音声を使う（案内文のみGoogleに送信）</label>
+        <button id="enter-mr" hidden data-ui>MR撮影を開く</button>
+        <details id="captures"><summary data-ui>実機の撮影記録</summary><ul></ul></details>
+      </div>
+      <p id="mr-feedback" role="status"></p>
+      <button id="retry-capture" hidden data-ui>撮影記録を再送する</button>
     </div>
     <section id="guide" hidden aria-label="手順とモデル">
       <div id="viewport" aria-label="機器の3Dモデル"></div>

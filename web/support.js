@@ -4,9 +4,14 @@ const byId = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 const user = encodeURIComponent(params.get("user") || "");
 const id = encodeURIComponent(params.get("id") || "");
-const manual = "/api/users/" + user + "/manuals/" + id;
+const demo = params.get("demo") === "1";
+const manual = demo ? "/api/venue-view/" + id : "/api/users/" + user + "/manuals/" + id;
 const api = manual + "/workflow";
-byId("back").href = "/users/" + user + "/";
+if (demo) {
+  import("./venue-session.js");
+}
+import("./capture-entry.js");
+byId("back").href = demo ? "/venue/DEMO/" : "/users/" + user + "/";
 byId("pdf").href = manual + "/pdf";
 let token, state, timer, guide, bindings, viewer, figures = [], figureIndex;
 
@@ -151,6 +156,8 @@ async function loadGuide(ready) {
     showTask();
   }
   if (ready && !bindings) {
+    if (!demo && state.alignment) import("./alignment-entry.js").then(m => m.prepareAlignment(api, token))
+      .catch(() => { byId("assist-status").textContent = "位置合わせを読み込めませんでした。"; });
     bindings = await asset("S2/bindings.json");
     byId("viewport").hidden = false;
     ui(byId("model-status"), "3Dモデルを読み込み中…");
@@ -178,6 +185,7 @@ async function refresh(action) {
     if (!response.ok) throw new Error(data.error);
     token = response.headers.get("X-Library-Generation");
     state = data;
+    byId("capture-tools").hidden = data.stage !== "ready";
     ui(byId("name"), "{name}", {name: data.name});
     byId("model").textContent = data.model || "";
     ui(document.querySelector("title"), "{name} | 作業支援", {name: data.name});

@@ -26,6 +26,12 @@ button:disabled { cursor: default; }
 h1 { font-size: 1.1rem; font-weight: 600; }
 #model { font-size: .85rem; color: var(--muted); }
 .workflow { max-width: 78rem; margin-inline: auto; padding: 0 24px; }
+#capture-tools { display: flex; align-items: baseline; flex-wrap: wrap; gap: 1rem; padding-top: .8rem; }
+#enter-assist, #enter-mr, #retry-capture { background: var(--mint); color: #19362e; padding: .6rem 1rem; border: 0; border-radius: 6px; font-weight: 600; }
+#enter-assist, #alignment-record { margin-top: .7rem; }
+#captures summary { cursor: pointer; }
+#captures ul { padding-left: 1.4rem; }
+#mr-feedback:not(:empty) { margin-block: .8rem; }
 #status:not(:empty), #choose:not([hidden]), #action:not([hidden]) { margin: 18px 0; }
 #guide {
   position: relative; isolation: isolate; display: grid; align-items: center;

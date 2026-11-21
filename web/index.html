@@ -5,21 +5,76 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title data-ui>ユーザー選択 | AR作業支援</title>
   <link rel="stylesheet" href="/library.css">
+  <link rel="stylesheet" href="/access.css">
+  <script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
   <script type="module" src="/language.js"></script>
+  <script type="module" src="/capture-entry.js"></script>
 </head>
 <body>
   <main class="entry">
-    <header class="entry-heading"><h1 data-ui>ユーザー選択</h1><select id="locale" aria-label="表示言語"><option value="ja" lang="ja">日本語</option><option value="en" lang="en">English</option></select></header>
-    <form action="/enter" method="get">
+    <header class="entry-heading"><h1 id="entry-title" data-ui>ユーザー選択</h1><select id="locale" aria-label="表示言語"><option value="ja" lang="ja">日本語</option><option value="en" lang="en">English</option></select></header>
+    <form class="user-entry" action="/enter" method="get">
       <label for="user" data-ui>ユーザーID</label>
       <input type="text" id="user" name="id" placeholder="P1" required maxlength="32"
              autocomplete="off" autocapitalize="characters" spellcheck="false">
       <p id="invalid" role="alert" hidden data-ui>このIDは使えません。P1のように半角英数字で始め、英数字・ハイフン・下線で入力してください。</p>
+      <label id="capture-voice-option" hidden><input type="checkbox" id="capture-live" checked> Gemini音声を使う（案内文のみGoogleに送信）</label>
+      <button class="btn primary" type="button" id="enter-mr" hidden data-ui>MR撮影を開く</button>
       <button class="btn primary" type="submit" data-ui>機器一覧を開く</button>
     </form>
+    <a id="open-demo" href="/venue/DEMO/" hidden data-ui>DEMOを開く</a>
+    <p id="mr-feedback" role="status"></p>
+    <button class="btn" id="retry-capture" hidden data-ui>撮影記録を再送する</button>
+    <div id="host-pairing" hidden>
+      <section id="device-manager" aria-labelledby="manager-title">
+        <header class="manager-heading">
+          <h2 id="manager-title" data-ui>許可中の端末</h2>
+          <button type="button" id="refresh-devices" class="quiet" data-ui>一覧を更新</button>
+        </header>
+        <div class="role-columns">
+          <section class="role-group demo-group" aria-labelledby="demo-title">
+            <header class="role-heading"><h3 id="demo-title">DEMO</h3><span id="demo-count"></span></header>
+            <p class="scope-note" data-ui>デモ用の機器・資料と、自分の撮影記録</p>
+            <div id="venue-controls" hidden>
+              <button type="button" class="btn" id="venue-code" data-ui>DEMOの参加QRを表示</button>
+              <output id="venue-result" aria-live="polite"></output>
+              <img id="venue-qr" alt="DEMO参加用QR" hidden>
+            </div>
+            <ul class="device-list" id="demo-devices"></ul>
+            <button type="button" class="quiet revoke" id="venue-end" hidden data-ui>DEMO端末を一括解除</button>
+          </section>
+          <section class="role-group personal-group" aria-labelledby="personal-title">
+            <header class="role-heading"><h3 id="personal-title" data-ui>個人端末</h3><span id="personal-count"></span></header>
+            <p class="scope-note" data-ui>各ユーザーの機器・資料と撮影記録</p>
+            <details id="personal-pairing">
+              <summary data-ui>自分の端末を登録</summary>
+              <p data-ui>QRを読み取った端末に申請番号が表示されます。番号を照合して承認すると、各ユーザーの資料を開けます。</p>
+              <button type="button" class="btn" id="issue-device-qr" data-ui>個人端末用QRを表示</button>
+              <output id="device-status" aria-live="polite"></output>
+              <img id="device-qr" alt="個人端末登録用QR" hidden>
+            </details>
+            <section id="pending-section" hidden>
+              <h4 data-ui>承認待ちの個人端末</h4>
+              <ul class="device-list" id="pending-devices"></ul>
+            </section>
+            <ul class="device-list" id="personal-devices"></ul>
+          </section>
+        </div>
+        <p id="device-feedback" role="status"></p>
+      </section>
+      <dialog id="edit-device" class="import-dialog" aria-labelledby="edit-title">
+        <h2 id="edit-title" data-ui>端末名を変更</h2>
+        <form><label><span data-ui>端末名</span><input id="edit-name" type="text" maxlength="64" autofocus></label>
+          <p class="edit-error" role="status"></p>
+          <div class="actions"><button type="button" class="btn" id="cancel-edit" data-ui>キャンセル</button>
+          <button type="submit" class="btn primary" data-ui>名前を保存</button></div>
+        </form>
+      </dialog>
+    </div>
   </main>
   <script>
     document.querySelector("#invalid").hidden = !new URLSearchParams(location.search).has("invalid");
   </script>
+  <script type="module" src="/pairing.js"></script>
 </body>
 </html>

@@ -1,10 +1,18 @@
-import {ui} from "./language.js";
+import {isHostPC, ui} from "./language.js";
 
 const participant = location.pathname.split("/")[2];
+const demo = location.pathname === "/venue/DEMO/";
+if (demo) {
+  const participantLabel = Object.assign(document.createElement("strong"), {id: "participant"});
+  const personal = Object.assign(document.createElement("a"), {id: "open-personal", href: "/", hidden: true});
+  ui(personal, "個人端末の画面へ");
+  document.querySelector(".switch-user").replaceWith(participantLabel, document.createTextNode(" "), personal);
+  import("./venue-session.js");
+}
 document.querySelector("#participant").textContent = participant;
 ui(document.querySelector("title"), "{user} の機器一覧 | AR作業支援", {user: participant});
 const userApi = "/api/users/" + encodeURIComponent(participant);
-const api = userApi + "/manuals";
+const api = demo ? "/api/venue-view" : userApi + "/manuals";
 const list = document.querySelector("#manuals");
 const listStatus = document.querySelector("#list-status");
 const retry = document.querySelector("#retry");
@@ -19,6 +27,7 @@ let importId;
 let listRequest = 0;
 let generation;
 const deleteButton = document.querySelector("#delete-user");
+deleteButton.closest("footer").hidden = !isHostPC;
 const deleteDialog = document.querySelector("#delete-dialog");
 const keepButton = document.querySelector("#keep-user");
 const confirmDelete = document.querySelector("#confirm-delete");
@@ -39,7 +48,9 @@ confirmDelete.onclick = async () => {
   confirmDelete.disabled = keepButton.disabled = true;
   ui(deleteError, "");
   try {
-    const response = await fetch(userApi, {method: "DELETE", headers: {"X-Library-Generation": deleteDialog.dataset.generation}});
+    const response = await fetch(userApi, {method: "DELETE", headers: {
+      "X-Library-Generation": deleteDialog.dataset.generation, "X-Host-Management": "1"
+    }});
     if (response.status === 409) {
       ui(deleteError, "ユーザー情報が変わりました。一覧を開き直してください。");
     } else if (!response.ok) {
@@ -70,7 +81,7 @@ const milestones = [
 function manualTile({id, name, model, cover, stage, failed}) {
   const tile = element("a", "tile");
   const base = api + "/" + encodeURIComponent(id);
-  tile.href = "/support.html?" + new URLSearchParams({user: participant, id});
+  tile.href = "/support.html?" + new URLSearchParams(demo ? {demo: "1", id} : {user: participant, id});
   tile.dataset.id = id;
   const labels = {models: "型番を確認中", select: "型番を選ぶ", s1: "手順と図を抽出中",
     s2: "初版モデルを作成中", ready: "作業支援を開く"};
@@ -95,7 +106,7 @@ function manualTile({id, name, model, cover, stage, failed}) {
     img.width = 320;
     img.height = 250;
     picture.append(img);
-  } else {
+  } else if (!demo) {
     picture.append(element("span", "pdf-placeholder", "PDF"));
   }
   row.append(rail, picture);
@@ -109,6 +120,9 @@ function manualTile({id, name, model, cover, stage, failed}) {
   }
   tile.append(row, caption);
   const item = element("article");
+  if (demo) {
+    rail.hidden = true;
+  }
   const pdf = element("a", "support-link");
   ui(pdf, "元PDFを開く");
   pdf.href = base + "/pdf";
@@ -127,8 +141,14 @@ async function refresh(focusId) {
     if (!response.ok) throw new Error();
     const rows = await response.json();
     if (request !== listRequest) return;
+    if (demo) document.querySelector("#open-personal").hidden = response.headers.get("X-Personal-Access") !== "1";
+    if (isHostPC && rows.some(row => row.stage === "ready") && !document.querySelector("#venue-code").onclick) {
+      const {setupVenue} = await import("./venue.js");
+      setupVenue();
+    }
     generation = response.headers.get("X-Library-Generation");
-    deleteButton.disabled = addButton.disabled = !generation;
+    deleteButton.disabled = !generation;
+    addButton.disabled = demo || !generation;
     list.replaceChildren(...rows.map(manualTile));
     const pictures = list.querySelectorAll("[data-glb]");
     if (pictures.length) {
